@@ -34,3 +34,55 @@ model profiles {
   onboarding_complete Boolean?  @default(false)
   updated_at          DateTime? @default(now()) @db.Timestamptz(6)
 }
+
+// ─── Messaging ────────────────────────────────────────────────────────────────
+//
+// conversations: one row per chat thread. Supports DMs now, group chats later
+//   (just add more participants). match_id links to future matchmaking so a
+//   matched pair auto-gets a conversation.
+//
+// conversation_participants: who is in each conversation + their last read
+//   timestamp. Unread count = messages created after last_read_at.
+//   Explicit join table so we can add per-participant metadata later.
+//
+// messages: immutable append-only log. sender_id is a profiles.id UUID stored
+//   as String (no FK constraint) to avoid RLS friction on the profiles table.
+
+model conversations {
+  id         String   @id @default(cuid())
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @updatedAt @db.Timestamptz(6)
+  match_id   String?  // reserved for matchmaking integration
+
+  participants conversation_participants[]
+  messages     messages[]
+
+  @@map("conversations")
+}
+
+model conversation_participants {
+  conversation_id String
+  profile_id      String   @db.Uuid
+  joined_at       DateTime @default(now()) @db.Timestamptz(6)
+  last_read_at    DateTime? @db.Timestamptz(6)
+
+  conversation conversations @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+
+  @@id([conversation_id, profile_id])
+  @@index([profile_id])
+  @@map("conversation_participants")
+}
+
+model messages {
+  id              String   @id @default(cuid())
+  conversation_id String
+  sender_id       String   @db.Uuid  // profiles.id
+  content         String   @db.Text
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  conversation conversations @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+
+  @@index([conversation_id, created_at])
+  @@index([sender_id])
+  @@map("messages")
+}
