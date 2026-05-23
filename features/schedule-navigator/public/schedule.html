@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Your ARDD Schedule</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f1117;
+      color: #f0f0f0;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 1.8rem;
+      color: #7c83f5;
+      margin-bottom: 6px;
+    }
+    .subtitle {
+      color: #888;
+      margin-bottom: 30px;
+      font-size: 0.95rem;
+    }
+    .session-card {
+      background: #1a1d27;
+      border: 1px solid #2e3148;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 14px;
+    }
+    .session-time {
+      font-size: 0.8rem;
+      color: #7c83f5;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+    .session-title {
+      font-size: 1rem;
+      color: #f0f0f0;
+      line-height: 1.5;
+    }
+    .session-score {
+      margin-top: 8px;
+      font-size: 0.78rem;
+      color: #555;
+    }
+    .score-bar {
+      height: 4px;
+      background: #2e3148;
+      border-radius: 4px;
+      margin-top: 6px;
+    }
+    .score-fill {
+      height: 4px;
+      background: #7c83f5;
+      border-radius: 4px;
+    }
+    .export-btn {
+      display: inline-block;
+      margin-bottom: 24px;
+      padding: 12px 24px;
+      background: #7c83f5;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .export-btn:hover { background: #6470f0; }
+    .back-btn {
+      display: inline-block;
+      margin-bottom: 24px;
+      margin-right: 12px;
+      padding: 12px 24px;
+      background: transparent;
+      color: #7c83f5;
+      border: 1px solid #7c83f5;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .tag {
+      display: inline-block;
+      background: #2e3148;
+      color: #aaa;
+      font-size: 0.75rem;
+      padding: 3px 10px;
+      border-radius: 20px;
+      margin-top: 8px;
+    }
+    .session-explanation {
+      font-size: 0.88rem;
+      color: #a78bfa;
+      margin-top: 8px;
+      line-height: 1.5;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Your Personalized ARDD Schedule</h1>
+    <p class="subtitle" id="subtitle">Loading your custom agenda...</p>
+
+    <div style="margin-bottom: 24px;">
+      <a href="/" class="back-btn">← Edit Profile</a>
+      <button class="export-btn" onclick="exportICS()">⬇ Export to Google Calendar (.ics)</button>
+    </div>
+
+    <div id="schedule-list"></div>
+  </div>
+
+  <script>
+    const data = JSON.parse(localStorage.getItem('schedule') || '{}');
+    const profile = JSON.parse(localStorage.getItem('profile') || '{}');
+
+    const schedule = data.schedule || [];
+
+    document.getElementById('subtitle').textContent =
+      `${schedule.length} sessions matched for ${profile.name || 'you'} · Goal: ${profile.goal || '—'}`;
+
+    const list = document.getElementById('schedule-list');
+
+    if (schedule.length === 0) {
+      list.innerHTML = '<p style="color:#888">No sessions found. Try going back and adjusting your profile.</p>';
+    } else {
+      const maxScore = Math.max(...schedule.map(s => s.score), 1);
+      schedule.forEach(session => {
+        const pct = Math.round((session.score / maxScore) * 100);
+        const card = document.createElement('div');
+        card.className = 'session-card';
+        card.innerHTML = `
+          <div class="session-time">🕐 ${session.time}</div>
+          <div class="session-title">${session.raw.replace(/\s+/g, ' ').trim()}</div>
+          ${session.explanation ? `<div class="session-explanation">✨ ${session.explanation}</div>` : ''}
+          <div class="score-bar"><div class="score-fill" style="width:${pct}%"></div></div>
+          <div class="session-score">Relevance score: ${session.score} / ${maxScore}</div>
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    function exportICS() {
+      if (schedule.length === 0) return alert('No sessions to export.');
+
+      let ics = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//ARDD Navigator//EN\n`;
+
+      schedule.forEach((session, i) => {
+        const title = session.raw.replace(/\s+/g, ' ').trim().slice(0, 80);
+        const dateStr = '20250901';
+        const timeClean = session.time.replace(':', '') + '00';
+        const uid = `ardd-session-${i}@navigator`;
+
+        ics += `BEGIN:VEVENT\n`;
+        ics += `UID:${uid}\n`;
+        ics += `DTSTART:${dateStr}T${timeClean}Z\n`;
+        ics += `DTEND:${dateStr}T${timeClean}Z\n`;
+        ics += `SUMMARY:${title}\n`;
+        ics += `DESCRIPTION:ARDD 2025 Session\n`;
+        ics += `END:VEVENT\n`;
+      });
+
+      ics += `END:VCALENDAR`;
+
+      const blob = new Blob([ics], { type: 'text/calendar' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'ardd-schedule.ics';
+      a.click();
+    }
+  </script>
+</body>
+</html>
+
