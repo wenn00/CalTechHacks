@@ -1,6 +1,7 @@
 'use client';
 import { supabase } from '@/lib/supabase';
 import { useState } from 'react';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -39,6 +40,18 @@ export default function LoginPage() {
         >
           {loading ? 'Sending...' : 'Send Magic Link'}
         </button>
+
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-6 pt-6 border-t border-gray-100">
+            <p className="text-xs text-center text-gray-500 mb-2">DEV MODE ONLY</p>
+            <Link
+              href="/onboarding?mock=true"
+              className="block w-full text-center bg-gray-100 text-gray-700 p-2 rounded hover:bg-gray-200 text-sm font-semibold"
+            >
+              Skip to Onboarding (Mock Data)
+            </Link>
+          </div>
+        )}
       </form>
     </div>
   );

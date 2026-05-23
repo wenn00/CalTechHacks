@@ -18,17 +18,31 @@ export default function OnboardingForm() {
   const nextStep = () => setStep((s) => s + 1);
 
   const submitProfile = async () => {
+    let userId;
+
+    // Check for mock mode in URL
+    const isMock = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mock') === 'true';
+
+    if (isMock) {
+      userId = '00000000-0000-0000-0000-000000000000'; // Standard mock UUID
+      console.log('Dev Mode: Mocking submission for user', userId, formData);
+      alert('Dev Mode: Profile would be saved here. Redirecting to channels...');
+      window.location.href = '/onboarding/channels?mock=true';
+      return;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
         alert('Please log in first');
         window.location.href = '/login';
         return;
     }
+    userId = user.id;
 
     const { error } = await supabase
       .from('profiles')
       .upsert({
-        id: user.id,
+        id: userId,
         ...formData,
         onboarding_complete: true,
         updated_at: new Date().toISOString()
