@@ -8,8 +8,8 @@ import GoalsQuestions from '@/components/onboarding/GoalsQuestions';
 export default function OnboardingForm() {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
-    full_name: '',
-    affiliation: '',
+    name: '',
+    institution: '',
     role: '',
     research_area: '',
     goals: [],
@@ -32,7 +32,7 @@ export default function OnboardingForm() {
     }
 
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    if (!user || !user.email) {
         alert('Please log in first');
         window.location.href = '/login';
         return;
@@ -43,6 +43,7 @@ export default function OnboardingForm() {
       .from('profiles')
       .upsert({
         id: userId,
+        email: user.email,
         ...formData,
         onboarding_complete: true,
         updated_at: new Date().toISOString()

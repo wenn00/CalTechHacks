@@ -12,8 +12,8 @@ export default function BasicQuestions({ data, update, onNext }: Props) {
         <label className="block text-sm font-medium">Full Name</label>
         <input
           type="text"
-          value={data.full_name}
-          onChange={(e) => update({ ...data, full_name: e.target.value })}
+          value={data.name}
+          onChange={(e) => update({ ...data, name: e.target.value })}
           className="w-full p-2 border border-gray-300 rounded"
         />
       </div>
@@ -21,8 +21,8 @@ export default function BasicQuestions({ data, update, onNext }: Props) {
         <label className="block text-sm font-medium">Affiliation</label>
         <input
           type="text"
-          value={data.affiliation}
-          onChange={(e) => update({ ...data, affiliation: e.target.value })}
+          value={data.institution}
+          onChange={(e) => update({ ...data, institution: e.target.value })}
           className="w-full p-2 border border-gray-300 rounded"
           placeholder="e.g., Harvard, Calico, Pfizer"
         />
