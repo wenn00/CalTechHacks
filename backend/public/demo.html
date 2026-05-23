@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ARDD Conference — Attendee Directory Demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f7; color: #1d1d1f; }
+
+    header { background: #1d1d1f; color: white; padding: 20px 32px; display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 20px; font-weight: 600; }
+    header span { font-size: 13px; color: #86868b; margin-left: auto; }
+
+    .controls { background: white; padding: 20px 32px; border-bottom: 1px solid #e5e5e7; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .search-box { flex: 1; min-width: 220px; position: relative; }
+    .search-box input { width: 100%; padding: 10px 16px 10px 40px; border: 1px solid #d2d2d7; border-radius: 10px; font-size: 15px; outline: none; transition: border-color .2s; }
+    .search-box input:focus { border-color: #0071e3; }
+    .search-box::before { content: "🔍"; position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 14px; }
+    select { padding: 10px 16px; border: 1px solid #d2d2d7; border-radius: 10px; font-size: 14px; background: white; outline: none; cursor: pointer; }
+    select:focus { border-color: #0071e3; }
+    button { padding: 10px 20px; background: #0071e3; color: white; border: none; border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer; transition: background .2s; white-space: nowrap; }
+    button:hover { background: #0077ed; }
+    button.clear { background: #f5f5f7; color: #1d1d1f; border: 1px solid #d2d2d7; }
+    button.clear:hover { background: #e8e8ed; }
+
+    .status-bar { padding: 12px 32px; font-size: 13px; color: #6e6e73; background: #fafafa; border-bottom: 1px solid #e5e5e7; }
+    .status-bar strong { color: #1d1d1f; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; padding: 24px 32px; }
+
+    .card { background: white; border-radius: 14px; padding: 20px; border: 1px solid #e5e5e7; cursor: pointer; transition: box-shadow .2s, transform .15s; }
+    .card:hover { box-shadow: 0 4px 20px rgba(0,0,0,.08); transform: translateY(-2px); }
+    .card-top { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+    .avatar { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #0071e3, #34c759); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 18px; flex-shrink: 0; overflow: hidden; }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .card-name { font-weight: 600; font-size: 16px; line-height: 1.3; }
+    .card-role { font-size: 13px; color: #6e6e73; margin-top: 2px; }
+    .card-institution { font-size: 13px; color: #0071e3; margin-bottom: 10px; }
+    .card-bio { font-size: 13px; color: #3d3d3f; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 12px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag { background: #f0f6ff; color: #0071e3; border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 500; }
+    .tag.area { background: #f0faf0; color: #1a7f37; }
+
+    .empty { grid-column: 1/-1; text-align: center; padding: 60px 20px; color: #6e6e73; }
+    .empty h3 { font-size: 18px; margin-bottom: 8px; }
+    .loading { grid-column: 1/-1; text-align: center; padding: 60px; color: #6e6e73; font-size: 16px; }
+
+    .pagination { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 24px; }
+    .pagination button { padding: 8px 16px; font-size: 14px; }
+    .pagination span { font-size: 14px; color: #6e6e73; }
+
+    /* Modal */
+    .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 100; align-items: center; justify-content: center; padding: 20px; }
+    .overlay.open { display: flex; }
+    .modal { background: white; border-radius: 18px; padding: 28px; max-width: 560px; width: 100%; max-height: 90vh; overflow-y: auto; position: relative; }
+    .modal-close { position: absolute; top: 16px; right: 16px; background: #f5f5f7; border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .modal-avatar { width: 72px; height: 72px; border-radius: 50%; background: linear-gradient(135deg, #0071e3, #34c759); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 28px; margin-bottom: 16px; overflow: hidden; }
+    .modal-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .modal h2 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    .modal-meta { font-size: 14px; color: #6e6e73; margin-bottom: 16px; }
+    .modal-section { margin-bottom: 16px; }
+    .modal-section h4 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #6e6e73; margin-bottom: 6px; }
+    .modal-section p { font-size: 14px; line-height: 1.6; color: #3d3d3f; }
+    .modal-links { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+    .modal-links a { padding: 8px 14px; border: 1px solid #d2d2d7; border-radius: 8px; text-decoration: none; font-size: 13px; color: #0071e3; font-weight: 500; }
+    .modal-links a:hover { background: #f0f6ff; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>🧬</div>
+  <h1>ARDD Conference — Attendee Directory</h1>
+  <span id="api-status">connecting...</span>
+</header>
+
+<div class="controls">
+  <div class="search-box">
+    <input type="text" id="search" placeholder="Search by name, bio, keywords, institution..." />
+  </div>
+  <select id="filter-area"><option value="">All Research Areas</option></select>
+  <select id="filter-stage"><option value="">All Career Stages</option></select>
+  <select id="filter-institution"><option value="">All Institutions</option></select>
+  <button onclick="fetchAttendees()">Search</button>
+  <button class="clear" onclick="clearFilters()">Clear</button>
+</div>
+
+<div class="status-bar" id="status-bar">Loading...</div>
+<div class="grid" id="grid"></div>
+<div class="pagination" id="pagination"></div>
+
+<div class="overlay" id="overlay" onclick="closeModal(event)">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script>
+  const API = 'http://localhost:3001/api';
+  let currentPage = 1;
+  let totalPages = 1;
+
+  // ── Bootstrap ────────────────────────────────────────────────────────────────
+
+  async function init() {
+    await loadFilters();
+    await fetchAttendees();
+    document.getElementById('search').addEventListener('keydown', e => {
+      if (e.key === 'Enter') { currentPage = 1; fetchAttendees(); }
+    });
+  }
+
+  async function loadFilters() {
+    try {
+      const res = await fetch(`${API}/attendees/filters`);
+      const { data } = await res.json();
+
+      populate('filter-area',        data.researchAreas,  v => v);
+      populate('filter-stage',       data.careerStages,   v => v?.replace(/_/g, ' '));
+      populate('filter-institution', data.institutions,   v => v);
+
+      document.getElementById('api-status').textContent = '● connected';
+      document.getElementById('api-status').style.color = '#30d158';
+    } catch {
+      document.getElementById('api-status').textContent = '● server offline';
+      document.getElementById('api-status').style.color = '#ff453a';
+    }
+  }
+
+  function populate(id, items, label) {
+    const sel = document.getElementById(id);
+    (items || []).filter(Boolean).forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v; opt.textContent = label(v);
+      sel.appendChild(opt);
+    });
+  }
+
+  // ── Fetch attendees ──────────────────────────────────────────────────────────
+
+  async function fetchAttendees(page = currentPage) {
+    const q           = document.getElementById('search').value.trim();
+    const researchArea = document.getElementById('filter-area').value;
+    const careerStage  = document.getElementById('filter-stage').value;
+    const institution  = document.getElementById('filter-institution').value;
+
+    const params = new URLSearchParams({ page, limit: 12 });
+    if (q)            params.set('q', q);
+    if (researchArea) params.set('research_area', researchArea);
+    if (careerStage)  params.set('career_stage', careerStage);
+    if (institution)  params.set('institution', institution);
+
+    document.getElementById('grid').innerHTML = '<div class="loading">Loading attendees...</div>';
+
+    try {
+      const res  = await fetch(`${API}/attendees?${params}`);
+      const json = await res.json();
+      const { data, meta } = json;
+
+      currentPage = meta.page;
+      totalPages  = meta.totalPages;
+
+      renderGrid(data);
+      renderPagination(meta);
+      document.getElementById('status-bar').innerHTML =
+        `Showing <strong>${data.length}</strong> of <strong>${meta.total}</strong> attendees — page ${meta.page} of ${meta.totalPages}`;
+    } catch (e) {
+      document.getElementById('grid').innerHTML = '<div class="empty"><h3>Could not reach the server</h3><p>Make sure npm run dev is running on port 3001</p></div>';
+    }
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────────
+
+  function renderGrid(attendees) {
+    const grid = document.getElementById('grid');
+    if (!attendees.length) {
+      grid.innerHTML = '<div class="empty"><h3>No attendees found</h3><p>Try a different search or clear filters.</p></div>';
+      return;
+    }
+    grid.innerHTML = attendees.map(a => `
+      <div class="card" onclick="openModal(${JSON.stringify(a).replace(/"/g, '&quot;')})">
+        <div class="card-top">
+          <div class="avatar">
+            ${a.photo_url
+              ? `<img src="${a.photo_url}" alt="${a.name}" onerror="this.parentElement.textContent='${initials(a.name)}'" />`
+              : initials(a.name)}
+          </div>
+          <div>
+            <div class="card-name">${a.name}</div>
+            <div class="card-role">${fmt(a.career_stage)} ${a.role ? '· ' + a.role : ''}</div>
+          </div>
+        </div>
+        ${a.institution ? `<div class="card-institution">🏛 ${a.institution}</div>` : ''}
+        ${a.bio ? `<div class="card-bio">${a.bio}</div>` : ''}
+        <div class="tags">
+          ${a.research_area ? `<span class="tag area">${a.research_area}</span>` : ''}
+          ${(a.research_keywords || []).slice(0, 4).map(k => `<span class="tag">${k}</span>`).join('')}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function renderPagination(meta) {
+    const el = document.getElementById('pagination');
+    if (meta.totalPages <= 1) { el.innerHTML = ''; return; }
+    el.innerHTML = `
+      <button class="clear" onclick="goTo(${meta.page - 1})" ${meta.page <= 1 ? 'disabled' : ''}>← Prev</button>
+      <span>Page ${meta.page} of ${meta.totalPages}</span>
+      <button onclick="goTo(${meta.page + 1})" ${meta.page >= meta.totalPages ? 'disabled' : ''}>Next →</button>
+    `;
+  }
+
+  function goTo(page) {
+    if (page < 1 || page > totalPages) return;
+    currentPage = page;
+    fetchAttendees(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ── Modal ────────────────────────────────────────────────────────────────────
+
+  function openModal(a) {
+    const goals = (a.goals || []).join(' · ') || '—';
+    const keywords = (a.research_keywords || []).map(k => `<span class="tag">${k}</span>`).join('');
+    const links = [
+      a.linkedin_url       && `<a href="${a.linkedin_url}" target="_blank">LinkedIn</a>`,
+      a.google_scholar_url && `<a href="${a.google_scholar_url}" target="_blank">Google Scholar</a>`,
+    ].filter(Boolean).join('');
+
+    document.getElementById('modal').innerHTML = `
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <div class="modal-avatar">
+        ${a.photo_url
+          ? `<img src="${a.photo_url}" alt="${a.name}" onerror="this.parentElement.textContent='${initials(a.name)}'" />`
+          : initials(a.name)}
+      </div>
+      <h2>${a.name}</h2>
+      <div class="modal-meta">${fmt(a.career_stage)}${a.role ? ' · ' + a.role : ''}${a.institution ? ' · ' + a.institution : ''}</div>
+      ${a.bio ? `<div class="modal-section"><h4>Bio</h4><p>${a.bio}</p></div>` : ''}
+      ${a.research_area ? `<div class="modal-section"><h4>Research Area</h4><p>${a.research_area}</p></div>` : ''}
+      ${keywords ? `<div class="modal-section"><h4>Keywords</h4><div class="tags" style="margin-top:4px">${keywords}</div></div>` : ''}
+      ${a.abstract_summary ? `<div class="modal-section"><h4>Abstract</h4><p>${a.abstract_summary}</p></div>` : ''}
+      ${goals !== '—' ? `<div class="modal-section"><h4>Conference Goals</h4><p>${goals}</p></div>` : ''}
+      ${a.company_name ? `<div class="modal-section"><h4>Company</h4><p>${a.company_name}${a.company_stage ? ' · ' + a.company_stage : ''}</p>${a.company_description ? '<p style="margin-top:4px">' + a.company_description + '</p>' : ''}</div>` : ''}
+      ${links ? `<div class="modal-links">${links}</div>` : ''}
+    `;
+    document.getElementById('overlay').classList.add('open');
+  }
+
+  function closeModal(e) {
+    if (!e || e.target === document.getElementById('overlay')) {
+      document.getElementById('overlay').classList.remove('open');
+    }
+  }
+
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+
+  function clearFilters() {
+    document.getElementById('search').value = '';
+    document.getElementById('filter-area').value = '';
+    document.getElementById('filter-stage').value = '';
+    document.getElementById('filter-institution').value = '';
+    currentPage = 1;
+    fetchAttendees();
+  }
+
+  function initials(name = '') {
+    return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  }
+
+  function fmt(s) {
+    return (s || '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  init();
+</script>
+</body>
+</html>
