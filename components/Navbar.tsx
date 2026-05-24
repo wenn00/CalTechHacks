@@ -62,6 +62,9 @@ export default function Navbar() {
     <nav className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-6">
       <Link href="/" className="font-bold text-gray-900 text-lg">🧬 ARDD 2026</Link>
       <Link href="/directory" className="text-sm text-gray-600 hover:text-gray-900 font-medium">Attendee Directory</Link>
+      {user && (
+        <Link href="/messages" className="text-sm text-gray-600 hover:text-gray-900 font-medium">Messages</Link>
+      )}
       <Link href="/onboarding" className="text-sm text-gray-600 hover:text-gray-900 font-medium">Onboarding</Link>
       <div className="ml-auto flex items-center gap-3">
         {loading ? (
