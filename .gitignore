@@ -29,6 +29,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!**/.env.example
 
 # vercel
 .vercel
@@ -37,3 +38,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 memory/
+
+# local working notes — gitignored on purpose
+docs/
+
+# git worktrees
+.worktrees/

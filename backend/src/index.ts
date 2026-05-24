@@ -4,6 +4,8 @@ import { env } from "./config/env";
 import { app } from "./app";
 import { prisma } from "./lib/prisma";
 import { setupSockets } from "./sockets";
+import { startBot } from "./bot/slack";
+import { startDailyDigestCron } from "./cron/daily-digest.cron";
 
 async function main() {
   await prisma.$connect();
@@ -21,6 +23,20 @@ async function main() {
     console.log(`  Environment: ${env.nodeEnv}`);
     console.log(`  API: http://localhost:${env.port}/api`);
   });
+
+  // Feature gates — keep bot and cron OFF by default so importing this file
+  // (tests, scripts, preview deploys) does not spin up a Socket Mode session
+  // or a scheduled job.
+  if (process.env.ENABLE_SLACK_BOT === "true") {
+    try {
+      await startBot();
+    } catch (err) {
+      console.error("✗ Failed to start Slack bot:", err);
+    }
+  }
+  if (process.env.ENABLE_DAILY_DIGEST_CRON === "true") {
+    startDailyDigestCron();
+  }
 }
 
 main().catch((err) => {
