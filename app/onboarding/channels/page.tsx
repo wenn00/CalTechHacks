@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
@@ -92,7 +92,17 @@ function getRecommendedChannels(goals: string[], researchArea: string): Channel[
   return Array.from(keys).map(k => ALL_CHANNELS[k]).filter(Boolean);
 }
 
+// useSearchParams() forces this subtree into CSR; Next.js 14 requires a
+// Suspense boundary around it so the surrounding page can still prerender.
 export default function ChannelsPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-gray-500">Loading your channels...</div>}>
+      <ChannelsPageContent />
+    </Suspense>
+  );
+}
+
+function ChannelsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isMock = searchParams.get('mock') === 'true';
