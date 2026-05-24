@@ -5,6 +5,7 @@ import profileRoutes  from "./profile.routes";
 import messageRoutes  from "./message.routes";
 import matchRoutes    from "./match.routes";
 import graphRoutes    from "./graph.routes";
+import socialRoutes   from "./social.routes";
 
 export const router = Router();
 
@@ -14,3 +15,4 @@ router.use("/profile",   profileRoutes);
 router.use("/messages",  messageRoutes);
 router.use("/matches",   matchRoutes);
 router.use("/graph",     graphRoutes);
+router.use("/social",    socialRoutes);
