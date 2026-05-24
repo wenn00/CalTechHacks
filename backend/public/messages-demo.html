@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mycellium — Messages Demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f7; color: #1d1d1f; height: 100vh; display: flex; flex-direction: column; }
+
+    header { background: #1d1d1f; color: white; padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 18px; font-weight: 600; }
+    header .who { font-size: 13px; color: #86868b; margin-left: auto; }
+    header button.logout { padding: 6px 12px; background: #3a3a3c; color: white; border: none; border-radius: 8px; font-size: 12px; cursor: pointer; }
+    header button.logout:hover { background: #4a4a4c; }
+
+    /* ─── LOGIN PANEL ─────────────────────────────────────────────────── */
+    #login-panel { max-width: 480px; margin: 80px auto; background: white; padding: 32px; border-radius: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+    #login-panel h2 { font-size: 22px; margin-bottom: 6px; }
+    #login-panel .subtitle { color: #6e6e73; font-size: 14px; margin-bottom: 24px; }
+    #login-panel .section { margin-bottom: 20px; }
+    #login-panel .section h3 { font-size: 13px; color: #6e6e73; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px; }
+    #login-panel input { width: 100%; padding: 10px 14px; border: 1px solid #d2d2d7; border-radius: 10px; font-size: 14px; margin-bottom: 8px; outline: none; }
+    #login-panel input:focus { border-color: #0071e3; }
+    #login-panel button { padding: 10px 18px; background: #0071e3; color: white; border: none; border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer; width: 100%; }
+    #login-panel button:hover { background: #0077ed; }
+    #login-panel button.secondary { background: #f5f5f7; color: #1d1d1f; border: 1px solid #d2d2d7; }
+    #login-panel button.secondary:hover { background: #e8e8ed; }
+    #login-panel .quick-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    #login-panel .error { color: #d70015; font-size: 13px; margin-top: 8px; }
+
+    /* ─── CHAT UI ──────────────────────────────────────────────────────── */
+    #chat-ui { flex: 1; display: none; overflow: hidden; }
+    #chat-ui.active { display: flex; }
+
+    aside.sidebar { width: 320px; background: white; border-right: 1px solid #e5e5e7; display: flex; flex-direction: column; }
+    aside.sidebar h3 { padding: 16px 20px 8px; font-size: 12px; color: #6e6e73; text-transform: uppercase; letter-spacing: 0.6px; }
+
+    .conv-list { flex: 1; overflow-y: auto; }
+    .conv-item { padding: 12px 20px; border-bottom: 1px solid #f5f5f7; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
+    .conv-item:hover { background: #fafafa; }
+    .conv-item.active { background: #e8f1ff; border-left: 3px solid #0071e3; padding-left: 17px; }
+    .conv-item .top { display: flex; justify-content: space-between; align-items: center; }
+    .conv-item .name { font-weight: 600; font-size: 14px; }
+    .conv-item .badge { background: #ff3b30; color: white; font-size: 11px; padding: 2px 6px; border-radius: 10px; min-width: 18px; text-align: center; }
+    .conv-item .preview { font-size: 12px; color: #6e6e73; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .new-chat { padding: 16px 20px; border-top: 1px solid #e5e5e7; background: #fafafa; }
+    .new-chat input { width: 100%; padding: 8px 12px; border: 1px solid #d2d2d7; border-radius: 8px; font-size: 13px; margin-bottom: 6px; outline: none; }
+    .new-chat input:focus { border-color: #0071e3; }
+    .new-chat button { width: 100%; padding: 8px; background: #0071e3; color: white; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; }
+    .new-chat .quick { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+    .new-chat .quick button { background: #f5f5f7; color: #1d1d1f; border: 1px solid #d2d2d7; font-size: 12px; padding: 6px; }
+
+    /* ─── messages pane ────────────────────────────────────────────────── */
+    section.thread { flex: 1; display: flex; flex-direction: column; background: #fafafa; }
+    .thread-header { padding: 14px 24px; background: white; border-bottom: 1px solid #e5e5e7; font-weight: 600; min-height: 56px; display: flex; align-items: center; gap: 8px; }
+    .thread-header .typing { font-size: 12px; color: #6e6e73; font-weight: 400; font-style: italic; }
+    .thread-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: #86868b; font-size: 14px; }
+
+    .messages { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 8px; }
+    .msg { max-width: 70%; padding: 8px 14px; border-radius: 18px; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
+    .msg.mine { align-self: flex-end; background: #0071e3; color: white; }
+    .msg.theirs { align-self: flex-start; background: white; border: 1px solid #e5e5e7; }
+    .msg .time { font-size: 11px; opacity: 0.7; margin-top: 2px; }
+
+    .composer { padding: 14px 24px; background: white; border-top: 1px solid #e5e5e7; display: flex; gap: 8px; }
+    .composer input { flex: 1; padding: 10px 14px; border: 1px solid #d2d2d7; border-radius: 20px; font-size: 14px; outline: none; }
+    .composer input:focus { border-color: #0071e3; }
+    .composer button { padding: 10px 20px; background: #0071e3; color: white; border: none; border-radius: 20px; font-size: 14px; font-weight: 500; cursor: pointer; }
+    .composer button:disabled { background: #c7c7cc; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🍄 Mycellium · Messages Demo</h1>
+    <span class="who" id="who">not logged in</span>
+    <button class="logout" id="logout-btn" style="display:none" onclick="logout()">Log out</button>
+  </header>
+
+  <!-- ─── LOGIN ─────────────────────────────────────────────────────── -->
+  <section id="login-panel">
+    <h2>Sign in</h2>
+    <p class="subtitle">Two browser windows = two users chatting. Try it.</p>
+
+    <div class="section">
+      <h3>Quick login (smoke test users)</h3>
+      <div class="quick-buttons">
+        <button class="secondary" onclick="quickLogin('a')">Login as Smoke A</button>
+        <button class="secondary" onclick="quickLogin('b')">Login as Smoke B</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>Or with your own account</h3>
+      <input id="email" placeholder="email" />
+      <input id="password" type="password" placeholder="password" />
+      <button onclick="customLogin()">Sign in / Sign up</button>
+    </div>
+
+    <p class="error" id="login-error"></p>
+  </section>
+
+  <!-- ─── CHAT ──────────────────────────────────────────────────────── -->
+  <main id="chat-ui">
+    <aside class="sidebar">
+      <h3>Conversations</h3>
+      <ul class="conv-list" id="conv-list"></ul>
+
+      <div class="new-chat">
+        <h3 style="padding:0;margin-bottom:6px">Start new chat</h3>
+        <input id="peer-uuid" placeholder="paste profile UUID…" />
+        <button onclick="startChatByUuid()">Open chat</button>
+        <div class="quick">
+          <button id="quick-a" onclick="startChatWithKnown('a')">↔ Smoke A</button>
+          <button id="quick-b" onclick="startChatWithKnown('b')">↔ Smoke B</button>
+        </div>
+      </div>
+    </aside>
+
+    <section class="thread">
+      <div class="thread-header" id="thread-header">
+        <span>Select or start a conversation</span>
+      </div>
+      <div class="thread-empty" id="thread-empty">← pick someone from the sidebar</div>
+      <div class="messages" id="messages" style="display:none"></div>
+      <div class="composer" style="display:none" id="composer">
+        <input id="msg-input" placeholder="Type a message… (Enter to send)" maxlength="5000" />
+        <button onclick="sendMessage()" id="send-btn">Send</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Socket.IO client served by the same backend instance -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // ─── config ─────────────────────────────────────────────────────────
+    // Supabase publishable anon key — safe to embed in client code.
+    const SUPABASE_URL      = 'https://nizazerelnajaxfmigex.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_rfkVGAuh3AYp9-4uicDnhw_otSJB_Hf';
+    const API = `${location.origin}/api/messages`;
+
+    // Smoke test users. Their UUIDs are stable across runs because the
+    // smoke script reuses the same auth.users rows.
+    const SMOKE = {
+      a: { email: 'smoke-mycel-a@example.com', password: 'Smoke!Mycel2026', uuid: 'c1650cf8-e72b-4d47-8f60-d23b31f6a52c', label: 'Smoke A' },
+      b: { email: 'smoke-mycel-b@example.com', password: 'Smoke!Mycel2026', uuid: '9cf6f4c1-36a1-4360-aec8-22d9d74e5b4c', label: 'Smoke B' },
+    };
+
+    // ─── state ──────────────────────────────────────────────────────────
+    let token = null;
+    let userId = null;
+    let userEmail = null;
+    let socket = null;
+    let convs = [];           // conversations cache
+    let currentConvId = null;
+    let typingTimer = null;
+
+    // ─── auth ───────────────────────────────────────────────────────────
+    async function supabasePost(path, body) {
+      const r = await fetch(`${SUPABASE_URL}/auth/v1/${path}`, {
+        method: 'POST',
+        headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await r.json().catch(() => ({}));
+      return { ok: r.ok, status: r.status, json };
+    }
+
+    async function quickLogin(which) {
+      const { email, password } = SMOKE[which];
+      await loginAs(email, password);
+    }
+
+    async function customLogin() {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      if (!email || !password) return showLoginError('email and password required');
+      await loginAs(email, password);
+    }
+
+    async function loginAs(email, password) {
+      showLoginError('');
+      // try sign-in first; if it fails, sign up
+      let r = await supabasePost('token?grant_type=password', { email, password });
+      if (!r.ok) {
+        r = await supabasePost('signup', { email, password });
+        if (!r.ok) return showLoginError(`Auth failed: ${r.json?.msg ?? r.status}`);
+      }
+      token     = r.json.access_token;
+      userId    = r.json.user.id;
+      userEmail = r.json.user.email;
+      onLoggedIn();
+    }
+
+    function logout() {
+      if (socket) socket.disconnect();
+      token = userId = userEmail = socket = null;
+      currentConvId = null;
+      convs = [];
+      document.getElementById('login-panel').style.display = 'block';
+      document.getElementById('chat-ui').classList.remove('active');
+      document.getElementById('who').textContent = 'not logged in';
+      document.getElementById('logout-btn').style.display = 'none';
+    }
+
+    function showLoginError(msg) {
+      document.getElementById('login-error').textContent = msg;
+    }
+
+    // ─── after login ────────────────────────────────────────────────────
+    async function onLoggedIn() {
+      document.getElementById('login-panel').style.display = 'none';
+      document.getElementById('chat-ui').classList.add('active');
+      document.getElementById('who').textContent = `${userEmail}  (uid ${userId.slice(0,8)}…)`;
+      document.getElementById('logout-btn').style.display = '';
+      // hide the "quick chat with smoke X" button for ourselves
+      if (userId === SMOKE.a.uuid) document.getElementById('quick-a').style.display = 'none';
+      if (userId === SMOKE.b.uuid) document.getElementById('quick-b').style.display = 'none';
+
+      connectSocket();
+      await loadConversations();
+    }
+
+    // ─── REST API helpers ───────────────────────────────────────────────
+    async function api(method, path, body) {
+      const r = await fetch(`${API}${path}`, {
+        method,
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+      const json = await r.json().catch(() => null);
+      if (!r.ok) console.warn(`API ${method} ${path} → ${r.status}`, json);
+      return { ok: r.ok, status: r.status, json };
+    }
+
+    async function loadConversations() {
+      const r = await api('GET', '/conversations');
+      convs = r.json?.data ?? [];
+      renderConvList();
+    }
+
+    function renderConvList() {
+      const ul = document.getElementById('conv-list');
+      ul.innerHTML = '';
+      if (convs.length === 0) {
+        ul.innerHTML = '<li style="padding:20px;color:#86868b;font-size:13px;text-align:center">no conversations yet — start one below</li>';
+        return;
+      }
+      for (const c of convs) {
+        const li = document.createElement('li');
+        li.className = 'conv-item' + (c.id === currentConvId ? ' active' : '');
+        li.onclick = () => openConversation(c.id);
+        const peerName = c.participants?.[0]?.name ?? 'Unknown';
+        const preview = c.last_message?.content ?? '— no messages yet —';
+        const badge = c.unread_count > 0 ? `<span class="badge">${c.unread_count}</span>` : '';
+        li.innerHTML = `
+          <div class="top"><span class="name">${escapeHtml(peerName)}</span>${badge}</div>
+          <div class="preview">${escapeHtml(preview)}</div>
+        `;
+        ul.appendChild(li);
+      }
+    }
+
+    // ─── start chat ─────────────────────────────────────────────────────
+    async function startChatWithKnown(which) {
+      const target = SMOKE[which];
+      if (target.uuid === userId) return alert("That's you — pick a different account.");
+      await startChat(target.uuid);
+    }
+
+    async function startChatByUuid() {
+      const uuid = document.getElementById('peer-uuid').value.trim();
+      if (!uuid) return;
+      if (uuid === userId) return alert("That's your own UUID.");
+      await startChat(uuid);
+      document.getElementById('peer-uuid').value = '';
+    }
+
+    async function startChat(participantId) {
+      const r = await api('POST', '/conversations', { participantId });
+      if (!r.ok) return alert(`Could not start chat: ${r.json?.error ?? r.status}`);
+      await loadConversations();
+      openConversation(r.json.data.id);
+    }
+
+    // ─── open + render a conversation ───────────────────────────────────
+    async function openConversation(id) {
+      currentConvId = id;
+      renderConvList();
+
+      // header
+      const conv = convs.find((c) => c.id === id);
+      const peerName = conv?.participants?.[0]?.name ?? 'Unknown';
+      document.getElementById('thread-header').innerHTML = `
+        <span>💬 ${escapeHtml(peerName)}</span>
+        <span class="typing" id="typing-indicator"></span>
+      `;
+
+      document.getElementById('thread-empty').style.display = 'none';
+      document.getElementById('messages').style.display = 'flex';
+      document.getElementById('composer').style.display = 'flex';
+
+      // load messages
+      const r = await api('GET', `/conversations/${id}/messages`);
+      const msgs = r.json?.data?.messages ?? [];
+      const box = document.getElementById('messages');
+      box.innerHTML = '';
+      for (const m of msgs) appendMessage(m);
+      scrollMessagesToEnd();
+
+      // join the conv socket room so we receive realtime events
+      socket?.emit('join_conversation', { conversationId: id });
+
+      // mark as read (HTTP + socket, both)
+      await api('PUT', `/conversations/${id}/read`);
+      socket?.emit('mark_read', { conversationId: id });
+      await loadConversations();
+    }
+
+    function appendMessage(m) {
+      const mine = m.sender_id === userId;
+      const div = document.createElement('div');
+      div.className = 'msg ' + (mine ? 'mine' : 'theirs');
+      const time = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      div.innerHTML = `${escapeHtml(m.content)}<div class="time">${time}</div>`;
+      document.getElementById('messages').appendChild(div);
+    }
+
+    function scrollMessagesToEnd() {
+      const box = document.getElementById('messages');
+      box.scrollTop = box.scrollHeight;
+    }
+
+    // ─── send ───────────────────────────────────────────────────────────
+    function sendMessage() {
+      const input = document.getElementById('msg-input');
+      const content = input.value.trim();
+      if (!content || !currentConvId) return;
+      // Send via socket so the server's broadcast immediately echoes back
+      // and reaches the peer in realtime. saveMessage is the same as REST.
+      socket.emit('send_message', { conversationId: currentConvId, content });
+      input.value = '';
+    }
+
+    // ─── socket realtime ────────────────────────────────────────────────
+    function connectSocket() {
+      socket = io({ auth: { token } });
+
+      socket.on('connect', () => console.log('socket connected', socket.id));
+      socket.on('connect_error', (e) => console.error('socket connect_error', e.message));
+      socket.on('error', (e) => console.error('socket error:', e));
+
+      socket.on('new_message', (payload) => {
+        const m = payload.message;
+        if (m.conversation_id === currentConvId) {
+          appendMessage(m);
+          scrollMessagesToEnd();
+          // we are looking at it → mark read immediately
+          api('PUT', `/conversations/${m.conversation_id}/read`);
+          socket.emit('mark_read', { conversationId: m.conversation_id });
+        }
+        // refresh sidebar regardless (badge counts, last_message previews)
+        loadConversations();
+      });
+
+      socket.on('user_typing', ({ conversationId }) => {
+        if (conversationId !== currentConvId) return;
+        const el = document.getElementById('typing-indicator');
+        if (!el) return;
+        el.textContent = 'typing…';
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(() => { el.textContent = ''; }, 2000);
+      });
+    }
+
+    // ─── input wiring ───────────────────────────────────────────────────
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && document.activeElement?.id === 'msg-input') {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+    document.addEventListener('input', (e) => {
+      if (e.target?.id !== 'msg-input' || !currentConvId) return;
+      socket?.emit('typing', { conversationId: currentConvId });
+    });
+
+    function escapeHtml(s) {
+      return String(s ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+  </script>
+</body>
+</html>
