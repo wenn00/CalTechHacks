@@ -9,7 +9,9 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [step, setStep] = useState<'email' | 'code'>('email');
+  const [intent, setIntent] = useState<'signin' | 'signup'>('signin');
   const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState('');
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
@@ -28,16 +30,19 @@ export default function LoginPage() {
   const handleSendCode = async (event: React.FormEvent) => {
     event.preventDefault();
     setLoading(true);
+    setNotice('');
     const { error } = await supabase.auth.signInWithOtp({
-      email,
+      email: email.trim(),
       options: {
         emailRedirectTo: `${window.location.origin}/onboarding`,
+        shouldCreateUser: intent === 'signup',
       },
     });
     if (error) {
       alert(error.message);
     } else {
       setStep('code');
+      setNotice(`We sent a six digit code to ${email.trim()}.`);
     }
     setLoading(false);
   };
@@ -45,8 +50,9 @@ export default function LoginPage() {
   const handleVerifyCode = async (event: React.FormEvent) => {
     event.preventDefault();
     setLoading(true);
+    setNotice('');
     const { error } = await supabase.auth.verifyOtp({
-      email,
+      email: email.trim(),
       token: code,
       type: 'email',
     });
@@ -69,10 +75,10 @@ export default function LoginPage() {
           <div className="absolute inset-0 bg-[#0b2e28]/70" />
           <div className="relative z-10 flex min-h-[300px] flex-col justify-between p-8 lg:min-h-screen lg:p-12">
             <div>
-              <img src="/mycellium/logo.png" alt="Mycellium" className="mb-5 h-14 w-14 object-cover object-left" />
+              <img src="/mycellium/logo.png" alt="Mycellium" className="mb-5 h-14 w-14 object-contain object-left" />
               <h1 className="text-3xl font-semibold leading-tight">Mycellium</h1>
               <p className="mt-3 max-w-sm text-sm leading-6 text-white/90">
-                Sign in to access your conference dashboard.
+                {intent === 'signin' ? 'Sign in to access your conference dashboard.' : 'Create your conference profile with a secure email code.'}
               </p>
             </div>
             <p className="hidden text-center text-xs text-white/85 lg:block">(c) Mycellium. All Rights Reserved</p>
@@ -80,9 +86,29 @@ export default function LoginPage() {
         </section>
 
         <section className="flex items-center justify-center px-6 py-10 lg:px-14">
-          <div className="w-full max-w-[640px] rounded-[32px] border border-zinc-200 bg-white px-8 py-10 lg:px-12 lg:py-14">
+          <div className="w-full max-w-[640px] rounded-lg border border-zinc-200 bg-white px-6 py-8 shadow-sm sm:px-8 lg:px-12 lg:py-14">
             <div className="mb-10 flex justify-center">
               <img src="/mycellium/logo.png" alt="Mycellium" className="h-24 w-72 object-contain" />
+            </div>
+
+            <div className="mb-7 grid grid-cols-2 rounded-lg bg-zinc-100 p-1">
+              {(['signin', 'signup'] as const).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => {
+                    setIntent(item);
+                    setStep('email');
+                    setCode('');
+                    setNotice('');
+                  }}
+                  className={`h-10 rounded-md text-sm font-semibold transition ${
+                    intent === item ? 'bg-white text-[#0b2e28] shadow-sm' : 'text-zinc-500 hover:text-zinc-900'
+                  }`}
+                >
+                  {item === 'signin' ? 'Sign In' : 'Create Account'}
+                </button>
+              ))}
             </div>
 
             <form className="space-y-7" onSubmit={step === 'email' ? handleSendCode : handleVerifyCode}>
@@ -97,6 +123,12 @@ export default function LoginPage() {
                 disabled={loading || step === 'code'}
                 required
               />
+
+              {notice && (
+                <div aria-live="polite" className="-mt-3 rounded border border-[#b8cac7] bg-[#f4faf8] px-4 py-3 text-sm text-[#195c52]">
+                  {notice}
+                </div>
+              )}
 
               {step === 'code' ? (
                 <div>
@@ -120,6 +152,7 @@ export default function LoginPage() {
                       onClick={() => {
                         setStep('email');
                         setCode('');
+                        setNotice('');
                       }}
                       className="text-sm text-[#2563eb] underline"
                     >
@@ -128,15 +161,15 @@ export default function LoginPage() {
                   </div>
                 </div>
               ) : (
-                <p className="-mt-3 text-right text-sm text-[#2563eb] underline">Email code sign-in</p>
+                <p className="-mt-3 text-right text-sm text-zinc-500">No password required</p>
               )}
 
               <MyButton
                 type="submit"
                 className="h-14 w-full text-lg"
-                disabled={loading || !email || (step === 'code' && code.length !== 6)}
+                disabled={loading || !email.trim() || (step === 'code' && code.length !== 6)}
               >
-                {loading ? (step === 'email' ? 'Sending...' : 'Verifying...') : 'Continue'}
+                {loading ? (step === 'email' ? 'Sending...' : 'Verifying...') : step === 'email' ? 'Continue' : 'Verify Code'}
               </MyButton>
             </form>
 
@@ -151,7 +184,19 @@ export default function LoginPage() {
             </button>
 
             <p className="mt-5 text-center text-sm text-zinc-400">
-              Don&apos;t have an account? <span className="text-[#061c2a] underline">Create one.</span>
+              {intent === 'signin' ? "Don't have an account?" : 'Already have an account?'}{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setIntent(intent === 'signin' ? 'signup' : 'signin');
+                  setStep('email');
+                  setCode('');
+                  setNotice('');
+                }}
+                className="text-[#061c2a] underline"
+              >
+                {intent === 'signin' ? 'Create one.' : 'Sign in.'}
+              </button>
             </p>
 
             {process.env.NODE_ENV === 'development' && (
