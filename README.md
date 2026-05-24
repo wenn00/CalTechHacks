@@ -83,14 +83,16 @@ Two surfaces:
 Open **two terminal tabs** in the repo root.
 
 ```bash
-# Tab 1 — backend
-cd backend && npm run dev          # → http://localhost:3001
+# Tab 1 — backend (REST API + Slack bot + daily-digest cron)
+cd backend && ENABLE_SLACK_BOT=true ENABLE_DAILY_DIGEST_CRON=true npm run dev   # → http://localhost:3001
 
 # Tab 2 — frontend
-npm run dev                        # → http://localhost:3000
+npm run dev                                                                     # → http://localhost:3000
 ```
 
 Open <http://localhost:3000>. Stop with `Ctrl+C` in each tab.
+
+> Omit `ENABLE_SLACK_BOT` / `ENABLE_DAILY_DIGEST_CRON` (or set them to `false`) to run the REST API alone — the Slack bot and cron will stay dormant. This is the right mode for tests, scripts, and anything that just imports `index.ts`.
 
 Quick health check (any tab):
 
