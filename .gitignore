@@ -37,3 +37,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 memory/
+
+# local working notes — gitignored on purpose
+docs/
+
+# git worktrees
+.worktrees/
