@@ -33,6 +33,12 @@ model profiles {
   match_score_cache   Json?     @default("{}")
   onboarding_complete Boolean?  @default(false)
   updated_at          DateTime? @default(now()) @db.Timestamptz(6)
+
+  // Reverse relations for the ARDD Slack bot (see models below). Nullable
+  // attendee/poster columns mean these arrays may stay empty for any given
+  // profile in MVP — Slack users are NOT required to be app users.
+  announcements_posted announcements[]       @relation("AnnouncementPostedBy")
+  session_impressions  session_impressions[] @relation("ImpressionAttendee")
 }
 
 // ─── Research Matcher ─────────────────────────────────────────────────────────
@@ -145,5 +151,154 @@ model messages {
   @@index([conversation_id, created_at])
   @@index([sender_id])
   @@map("messages")
+}
+
+// ─── ARDD Community Slack Bot ─────────────────────────────────────────────────
+//
+// All models below back the /ardd Slack subcommands. The bot operates at the
+// community level (anyone in the workspace can interact) — Slack users are NOT
+// required to also be registered app users (profiles). FK columns to
+// profiles.id are therefore nullable; the bot always stores the Slack user id
+// via *_slack_user_id columns as the canonical identity.
+//
+// Naming follows the existing schema convention: snake_case model and table
+// names. @@map is added for clarity even where model name and table name
+// match.
+//
+// IMPORTANT — sessions: this model represents the existing `sessions` table in
+// Supabase that schedule-navigator already queries. Legacy columns
+// (title, speaker, track, start_time, end_time, tags, location, day) are
+// preserved as nullable until `prisma db pull` confirms the live schema.
+// New columns (description, conference_date_key, conference_day, speaker_id,
+// track_id) start nullable. After the backfill script populates
+// conference_date_key and conference_day, a follow-up schema edit drops the
+// `?` on those two so they become NOT NULL.
+
+model sessions {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  // Legacy / existing columns — best-guess types based on
+  // features/schedule-navigator/scraper.js. Verify via `prisma db pull` once
+  // DATABASE_URL is configured and adjust before the first `db push`.
+  title               String?
+  speaker             String?  // legacy fallback name string
+  track               String?  // legacy fallback name string
+  start_time          DateTime?
+  end_time            DateTime?
+  tags                String[]
+  location            String?
+  day                 String?  // legacy "day1"/"day2"/etc. string
+
+  // New columns for /ardd
+  description         String?
+  conference_date_key String?  // "YYYY-MM-DD" in CONFERENCE_TIMEZONE — required after backfill
+  conference_day      Int?     // 1, 2, 3, ... — required after backfill
+  speaker_id          String?
+  track_id            String?
+
+  speaker_entity      speakers? @relation("SessionSpeaker", fields: [speaker_id], references: [id])
+  track_entity        tracks?   @relation("SessionTrack",   fields: [track_id],   references: [id])
+  impressions         session_impressions[]
+
+  created_at          DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([conference_day])
+  @@index([conference_date_key])
+  @@index([start_time])
+  @@map("sessions")
+}
+
+model speakers {
+  id          String     @id @default(cuid())
+  name        String
+  bio         String?
+  title       String?
+  institution String?
+  // photo_url intentionally omitted in MVP. Slack image_url blocks require a
+  // stable public host; defer until Cloudinary / Supabase Storage hookup.
+  sessions    sessions[] @relation("SessionSpeaker")
+  created_at  DateTime   @default(now()) @db.Timestamptz(6)
+
+  @@index([name])
+  @@map("speakers")
+}
+
+model tracks {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  description String?
+  sessions    sessions[] @relation("SessionTrack")
+  created_at  DateTime   @default(now()) @db.Timestamptz(6)
+
+  @@map("tracks")
+}
+
+model announcements {
+  id                     String    @id @default(cuid())
+  content                String
+  posted_by_slack_user_id String   // canonical bot-side identity; required
+  posted_by_profile_id    String?  @db.Uuid  // nullable — mapping deferred
+  broadcasted_at         DateTime?
+  slack_channel_id       String?
+  slack_message_ts       String?   // reserved for future edit / threading
+  created_at             DateTime  @default(now()) @db.Timestamptz(6)
+
+  posted_by_profile      profiles? @relation("AnnouncementPostedBy", fields: [posted_by_profile_id], references: [id])
+
+  @@index([posted_by_slack_user_id])
+  @@map("announcements")
+}
+
+model session_impressions {
+  id            String    @id @default(cuid())
+  session_id    String    @db.Uuid  // FK to sessions.id (UUID)
+  slack_user_id String    // canonical bot-side identity; required
+  attendee_id   String?   @db.Uuid  // nullable — mapping deferred
+  note          String
+  created_at    DateTime  @default(now()) @db.Timestamptz(6)
+
+  session       sessions  @relation(fields: [session_id], references: [id])
+  attendee      profiles? @relation("ImpressionAttendee", fields: [attendee_id], references: [id])
+
+  @@index([session_id])
+  @@index([slack_user_id])
+  @@map("session_impressions")
+}
+
+model bot_messages {
+  id                String   @id @default(cuid())
+  interaction_type  String   // "slash_command" | "view_submission" | "cron" | "system"
+  slack_user_id     String?  // nullable — cron/system interactions have no Slack user
+  slack_channel_id  String?  // nullable — some view_submissions do not carry channel context
+  slack_team_id     String?
+  command           String?  // "/ardd" for slash command; null for cron/system
+  subcommand        String?  // "now", "note", ...
+  text              String?  // raw command.text after the subcommand token (may be empty)
+  // SANITIZED: never store response_url, trigger_id, raw token, or full headers.
+  result_summary    String?  // short handler-decided string (e.g. "3 sessions returned")
+  result_kind       String   // "success" | "error" | "denied" | "noop"
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([slack_user_id])
+  @@index([created_at])
+  @@index([interaction_type])
+  @@map("bot_messages")
+}
+
+model daily_digest_runs {
+  id                String    @id @default(cuid())
+  digest_date_key   String    // the date the digest is FOR, "YYYY-MM-DD" in CONFERENCE_TIMEZONE
+  run_kind          String    // "scheduled" | "manual_post" | "test"
+  channel_id        String
+  content           String    @db.Text
+  posted_at         DateTime?
+  slack_message_ts  String?
+  created_at        DateTime  @default(now()) @db.Timestamptz(6)
+
+  // NO unique on (digest_date_key, channel_id) — multiple runs per day are
+  // allowed (scheduled / manual_post / test) and keep history. The /ardd
+  // digest preview is NEVER persisted here; it only writes to bot_messages.
+  @@index([digest_date_key])
+  @@map("daily_digest_runs")
 }
 
