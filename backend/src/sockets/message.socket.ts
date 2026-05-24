@@ -49,16 +49,30 @@ export function registerMessageHandlers(io: Server, socket: Socket) {
       }
 
       const message = await saveMessage(conversationId, userId, content.trim());
+      // Defensive: saveMessage returns null if the sender lost membership
+      // between the check above and the write (e.g. removed from the conv).
+      if (!message) {
+        socket.emit("error", { message: "Not a participant in this conversation" });
+        return;
+      }
 
       // Broadcast to everyone in the conversation room (including sender)
       io.to(`conv:${conversationId}`).emit("new_message", { message });
 
-      // Also push to participant personal rooms for unread badge updates
-      const participants = await prisma.conversation_participants.findMany({
-        where: { conversation_id: conversationId },
-      });
+      // Also push to participant personal rooms for unread badge updates —
+      // but skip peers who are already in the conv room, otherwise they
+      // receive `new_message` twice (once from the room broadcast above,
+      // once from the personal push).
+      const [participants, convSockets] = await Promise.all([
+        prisma.conversation_participants.findMany({ where: { conversation_id: conversationId } }),
+        io.in(`conv:${conversationId}`).fetchSockets(),
+      ]);
+      const usersInConvRoom = new Set(
+        convSockets.map((s) => (s as any).user?.id).filter(Boolean) as string[],
+      );
       participants
         .filter((p) => p.profile_id !== userId)
+        .filter((p) => !usersInConvRoom.has(p.profile_id))
         .forEach((p) => {
           io.to(`user:${p.profile_id}`).emit("new_message", { message, conversationId });
         });
