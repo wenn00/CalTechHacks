@@ -34,8 +34,8 @@ type AppSidebarProps = {
 
 export function AppSidebar({ view, onViewChange }: AppSidebarProps) {
   return (
-    <aside className="flex border-zinc-200 bg-white md:min-h-screen md:w-[92px] md:border-r lg:w-[260px]">
-      <div className="flex w-full items-center justify-between gap-4 overflow-x-auto px-4 py-3 md:flex-col md:items-stretch md:overflow-visible md:p-8">
+    <aside className="flex border-zinc-200 bg-white md:sticky md:top-0 md:h-screen md:min-h-screen md:w-[92px] md:border-r lg:w-[260px]">
+      <div className="flex w-full items-center justify-between gap-4 overflow-x-auto px-4 py-3 md:h-full md:flex-col md:items-stretch md:overflow-hidden md:p-8">
         <div className="flex items-center gap-3 md:flex-col md:items-stretch md:gap-10">
           <img src="/mycellium/logo.png" alt="Mycellium" className="h-10 w-10 object-contain object-left lg:h-20 lg:w-48" />
           <nav className="flex items-center gap-2 md:flex-col md:items-stretch md:gap-4">

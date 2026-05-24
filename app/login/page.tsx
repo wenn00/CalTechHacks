@@ -75,7 +75,7 @@ export default function LoginPage() {
           <div className="absolute inset-0 bg-[#0b2e28]/70" />
           <div className="relative z-10 flex min-h-[300px] flex-col justify-between p-8 lg:min-h-screen lg:p-12">
             <div>
-              <img src="/mycellium/logo.png" alt="Mycellium" className="mb-5 h-14 w-14 object-contain object-left" />
+              <img src="/mycellium/logo.png" alt="Mycellium" className="mb-5 h-14 w-40 object-contain object-left" />
               <h1 className="text-3xl font-semibold leading-tight">Mycellium</h1>
               <p className="mt-3 max-w-sm text-sm leading-6 text-white/90">
                 {intent === 'signin' ? 'Sign in to access your conference dashboard.' : 'Create your conference profile with a secure email code.'}
