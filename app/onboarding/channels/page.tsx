@@ -106,7 +106,7 @@ export default function ChannelsPage() {
       if (isMock) {
         // Show all channels in mock mode
         setChannels(Object.values(ALL_CHANNELS));
-        setName('there');
+        setName('Attendee');
         setLoading(false);
         return;
       }
@@ -120,8 +120,15 @@ export default function ChannelsPage() {
         .eq('id', user.id)
         .single();
 
+      const metaName =
+        (user.user_metadata?.full_name as string | undefined) ??
+        (user.user_metadata?.name as string | undefined);
+      const profileFirst = profile?.name?.trim() ? profile.name.split(' ')[0] : null;
+      const metaFirst = metaName?.split(' ')[0];
+      const emailPrefix = user.email?.split('@')[0];
+      setName(profileFirst ?? metaFirst ?? emailPrefix ?? 'there');
+
       if (profile) {
-        setName(profile.name?.split(' ')[0] || 'there');
         setChannels(getRecommendedChannels(profile.goals || [], profile.research_area || ''));
       } else {
         setChannels(Object.values(ALL_CHANNELS));
