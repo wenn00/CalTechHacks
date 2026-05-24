@@ -61,7 +61,8 @@ export default function Navbar() {
     pathname?.startsWith('/onboarding') ||
     pathname === '/directory' ||
     pathname === '/schedule' ||
-    pathname === '/map'
+    pathname === '/map' ||
+    pathname === '/videos'
   ) return null;
 
   return (

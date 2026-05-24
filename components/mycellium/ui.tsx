@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 const navIconClass = 'h-5 w-5';
-type SidebarSection = 'directory' | 'matches' | 'schedule' | 'messages' | 'map' | 'profile';
+type SidebarSection = 'directory' | 'matches' | 'schedule' | 'messages' | 'map' | 'videos';
 
 type BrandRailProps = {
   children?: ReactNode;
@@ -195,11 +195,11 @@ export function AppSidebar({ view = 'directory', onViewChange, activeSection }: 
               onClick={() => router.push('/map')}
             />
             <SidebarButton
-              active={active === 'profile'}
+              active={active === 'videos'}
               collapsed={collapsed}
-              icon={<ProfileIcon />}
-              label="Profile"
-              onClick={() => router.push('/onboarding')}
+              icon={<VideoIcon />}
+              label="Video Library"
+              onClick={() => router.push('/videos')}
             />
           </nav>
         </div>
@@ -490,11 +490,11 @@ function MapIcon() {
   );
 }
 
-function ProfileIcon() {
+function VideoIcon() {
   return (
     <svg className={navIconClass} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21a8 8 0 0 1 16 0" />
+      <rect x="3" y="5" width="14" height="14" rx="2" />
+      <path d="m17 9 4-2v10l-4-2" />
     </svg>
   );
 }
