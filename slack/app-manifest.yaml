@@ -1,0 +1,31 @@
+display_information:
+  name: ARDD Community Bot
+  description: ARDD community bot — sessions, speakers, impressions, daily digest
+  long_description: >-
+    Conference-wide Slack bot for the ARDD event. Provides live session lookup,
+    speaker information, schedule queries, attendee-submitted session
+    impressions, admin announcements, and an automated daily digest.
+    All commands use the /ardd namespace to avoid collisions with other
+    workspace apps.
+features:
+  bot_user:
+    display_name: ardd
+    always_online: true
+  slash_commands:
+    - command: /ardd
+      description: ARDD community bot
+      usage_hint: now | next | schedule | speaker | note | notes | announce | digest | help
+      should_escape: true
+oauth_config:
+  scopes:
+    bot:
+      - commands
+      - chat:write
+      # chat:write.public — only needed if posting to public channels the bot has not joined.
+      # users:read — only needed if mapping Slack users to Profile records or showing display names.
+settings:
+  interactivity:
+    is_enabled: true
+  socket_mode_enabled: true
+  org_deploy_enabled: false
+  token_rotation_enabled: false
