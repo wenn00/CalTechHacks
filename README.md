@@ -283,26 +283,6 @@ Real errors that came up during setup:
 | `/ardd now` always empty even with sessions seeded | The system clock is outside the conference window | Set `DEMO_NOW_ISO=…` in `.env` and restart. |
 | `db push` refuses with "Made the column required" errors | A NOT NULL column has rows that are NULL | Run `npx tsx prisma/backfill-conference-dates.ts`, verify no NULL rows remain, then re-`db push`. |
 
-## Demo day playbook
-
-Before the demo:
-
-- [ ] `npx prisma db push` and `npx tsx prisma/seed-bot-demo.ts` against a fresh-enough state
-- [ ] Verify in Supabase: `sessions`, `speakers`, `tracks`, `announcements`, `session_impressions` all have rows
-- [ ] Start backend with both gates on: `ENABLE_SLACK_BOT=true ENABLE_DAILY_DIGEST_CRON=true npm run dev`
-- [ ] Confirm the four startup log lines (DB connected → server → Slack bot connected → cron scheduled)
-- [ ] If the demo day ≠ conference day, set `DEMO_NOW_ISO` so `/ardd now` returns something live
-- [ ] Make sure `ADMIN_SLACK_USER_IDS` includes the presenter so `/ardd announce` works on stage
-
-During the demo (suggested ~3-minute flow):
-
-1. `/ardd help` — establish the surface area
-2. `/ardd schedule today` — show the seeded schedule
-3. `/ardd speaker <name>` — show a speaker card
-4. `/ardd note` → submit an impression → `/ardd notes <id>` — show the round-trip
-5. `/ardd announce <text>` — show the broadcast landing in the channel
-6. `/ardd digest` — show the EOD digest preview format
-
 ## What's out of scope for this MVP
 
 - Production deploy (Vercel / Fly / Railway) — the bot is designed for Socket Mode dev.
