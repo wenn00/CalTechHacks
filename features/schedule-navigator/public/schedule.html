@@ -13,99 +13,100 @@
       min-height: 100vh;
       padding: 40px 20px;
     }
-    .container {
-      max-width: 800px;
-      margin: 0 auto;
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 1.8rem; color: #7c83f5; margin-bottom: 6px; }
+    .subtitle { color: #888; margin-bottom: 30px; font-size: 0.95rem; }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
     }
-    h1 {
-      font-size: 1.8rem;
+    .back-btn {
+      padding: 10px 20px;
+      background: transparent;
       color: #7c83f5;
-      margin-bottom: 6px;
+      border: 1px solid #7c83f5;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      font-weight: 600;
+      text-decoration: none;
     }
-    .subtitle {
-      color: #888;
-      margin-bottom: 30px;
-      font-size: 0.95rem;
+    .select-all-btn {
+      padding: 10px 18px;
+      background: transparent;
+      color: #aaa;
+      border: 1px solid #2e3148;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      cursor: pointer;
     }
+    .select-all-btn:hover { border-color: #7c83f5; color: #7c83f5; }
+    .btn {
+      padding: 10px 20px;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn-purple { background: #7c83f5; }
+    .btn-purple:hover { background: #6470f0; }
+    .btn-green { background: #10b981; }
+    .btn-green:hover { background: #059669; }
+    .btn:disabled { background: #2e3148; color: #555; cursor: not-allowed; }
+    .select-info { font-size: 0.85rem; color: #888; margin-left: auto; }
     .session-card {
       background: #1a1d27;
       border: 1px solid #2e3148;
       border-radius: 12px;
       padding: 20px;
       margin-bottom: 14px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
     }
+    .session-card.selected {
+      border-color: #7c83f5;
+      background: #1e2035;
+    }
+    .session-checkbox {
+      margin-top: 4px;
+      width: 18px;
+      height: 18px;
+      accent-color: #7c83f5;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .session-content { flex: 1; }
     .session-time {
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       color: #7c83f5;
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
-    .session-title {
-      font-size: 1rem;
-      color: #f0f0f0;
-      line-height: 1.5;
-    }
-    .session-score {
-      margin-top: 8px;
-      font-size: 0.78rem;
-      color: #555;
-    }
-    .score-bar {
-      height: 4px;
-      background: #2e3148;
-      border-radius: 4px;
-      margin-top: 6px;
-    }
-    .score-fill {
-      height: 4px;
-      background: #7c83f5;
-      border-radius: 4px;
-    }
-    .export-btn {
-      display: inline-block;
-      margin-bottom: 24px;
-      padding: 12px 24px;
-      background: #7c83f5;
-      color: white;
-      border: none;
-      border-radius: 10px;
-      font-size: 0.95rem;
-      cursor: pointer;
-      font-weight: 600;
-      text-decoration: none;
-    }
-    .export-btn:hover { background: #6470f0; }
-    .back-btn {
-      display: inline-block;
-      margin-bottom: 24px;
-      margin-right: 12px;
-      padding: 12px 24px;
-      background: transparent;
-      color: #7c83f5;
-      border: 1px solid #7c83f5;
-      border-radius: 10px;
-      font-size: 0.95rem;
-      cursor: pointer;
-      font-weight: 600;
-      text-decoration: none;
-    }
-    .tag {
-      display: inline-block;
-      background: #2e3148;
-      color: #aaa;
-      font-size: 0.75rem;
-      padding: 3px 10px;
-      border-radius: 20px;
-      margin-top: 8px;
-    }
+    .session-title { font-size: 1rem; color: #f0f0f0; line-height: 1.5; }
     .session-explanation {
-      font-size: 0.88rem;
+      font-size: 0.86rem;
       color: #a78bfa;
       margin-top: 8px;
       line-height: 1.5;
       font-style: italic;
     }
+    .score-bar {
+      height: 4px;
+      background: #2e3148;
+      border-radius: 4px;
+      margin-top: 10px;
+    }
+    .score-fill { height: 4px; background: #7c83f5; border-radius: 4px; }
+    .session-score { margin-top: 6px; font-size: 0.75rem; color: #555; }
   </style>
 </head>
 <body>
@@ -113,9 +114,12 @@
     <h1>Your Personalized ARDD Schedule</h1>
     <p class="subtitle" id="subtitle">Loading your custom agenda...</p>
 
-    <div style="margin-bottom: 24px;">
+    <div class="toolbar">
       <a href="/" class="back-btn">← Edit Profile</a>
-      <button class="export-btn" onclick="exportICS()">⬇ Export to Google Calendar (.ics)</button>
+      <button class="select-all-btn" onclick="toggleSelectAll()">Select All</button>
+      <button class="btn btn-purple" id="ics-btn" onclick="exportICS()" disabled>⬇ Download .ics</button>
+      <button class="btn btn-green" id="gcal-btn" onclick="addToGoogleCalendar()" disabled>📅 Add to Google Calendar</button>
+      <span class="select-info" id="select-info">No sessions selected</span>
     </div>
 
     <div id="schedule-list"></div>
@@ -124,61 +128,128 @@
   <script>
     const data = JSON.parse(localStorage.getItem('schedule') || '{}');
     const profile = JSON.parse(localStorage.getItem('profile') || '{}');
-
     const schedule = data.schedule || [];
+    const selected = new Set();
 
     document.getElementById('subtitle').textContent =
       `${schedule.length} sessions matched for ${profile.name || 'you'} · Goal: ${profile.goal || '—'}`;
 
     const list = document.getElementById('schedule-list');
 
+    function updateUI() {
+      const count = selected.size;
+      document.getElementById('select-info').textContent =
+        count === 0 ? 'No sessions selected' : `${count} session${count > 1 ? 's' : ''} selected`;
+      document.getElementById('ics-btn').disabled = count === 0;
+      document.getElementById('gcal-btn').disabled = count === 0;
+    }
+
+    function toggleSession(index, card, checkbox) {
+      if (selected.has(index)) {
+        selected.delete(index);
+        card.classList.remove('selected');
+        checkbox.checked = false;
+      } else {
+        selected.add(index);
+        card.classList.add('selected');
+        checkbox.checked = true;
+      }
+      updateUI();
+    }
+
+    let allSelected = false;
+    function toggleSelectAll() {
+      allSelected = !allSelected;
+      document.querySelectorAll('.session-card').forEach((card, i) => {
+        const checkbox = card.querySelector('.session-checkbox');
+        if (allSelected) {
+          selected.add(i);
+          card.classList.add('selected');
+          checkbox.checked = true;
+        } else {
+          selected.delete(i);
+          card.classList.remove('selected');
+          checkbox.checked = false;
+        }
+      });
+      document.querySelector('.select-all-btn').textContent = allSelected ? 'Deselect All' : 'Select All';
+      updateUI();
+    }
+
     if (schedule.length === 0) {
       list.innerHTML = '<p style="color:#888">No sessions found. Try going back and adjusting your profile.</p>';
     } else {
       const maxScore = Math.max(...schedule.map(s => s.score), 1);
-      schedule.forEach(session => {
+      schedule.forEach((session, i) => {
         const pct = Math.round((session.score / maxScore) * 100);
         const card = document.createElement('div');
         card.className = 'session-card';
-        card.innerHTML = `
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'session-checkbox';
+
+        const content = document.createElement('div');
+        content.className = 'session-content';
+        content.innerHTML = `
           <div class="session-time">🕐 ${session.time}</div>
           <div class="session-title">${session.raw.replace(/\s+/g, ' ').trim()}</div>
           ${session.explanation ? `<div class="session-explanation">✨ ${session.explanation}</div>` : ''}
           <div class="score-bar"><div class="score-fill" style="width:${pct}%"></div></div>
           <div class="session-score">Relevance score: ${session.score} / ${maxScore}</div>
         `;
+
+        card.appendChild(checkbox);
+        card.appendChild(content);
+        card.addEventListener('click', (e) => { if (e.target !== checkbox) toggleSession(i, card, checkbox); });
+        checkbox.addEventListener('change', () => toggleSession(i, card, checkbox));
         list.appendChild(card);
       });
     }
 
+    updateUI();
+
     function exportICS() {
-      if (schedule.length === 0) return alert('No sessions to export.');
-
+      if (selected.size === 0) return alert('Please select at least one session.');
       let ics = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//ARDD Navigator//EN\n`;
-
-      schedule.forEach((session, i) => {
+      [...selected].forEach(i => {
+        const session = schedule[i];
         const title = session.raw.replace(/\s+/g, ' ').trim().slice(0, 80);
-        const dateStr = '20250901';
+        const dateStr = '20260901';
         const timeClean = session.time.replace(':', '') + '00';
         const uid = `ardd-session-${i}@navigator`;
-
         ics += `BEGIN:VEVENT\n`;
         ics += `UID:${uid}\n`;
         ics += `DTSTART:${dateStr}T${timeClean}Z\n`;
         ics += `DTEND:${dateStr}T${timeClean}Z\n`;
         ics += `SUMMARY:${title}\n`;
-        ics += `DESCRIPTION:ARDD 2025 Session\n`;
+        ics += `DESCRIPTION:ARDD 2026 Session - David Rubenstein Treehouse, Harvard University\n`;
+        ics += `LOCATION:David Rubenstein Treehouse, Harvard University, Boston MA\n`;
         ics += `END:VEVENT\n`;
       });
-
       ics += `END:VCALENDAR`;
-
       const blob = new Blob([ics], { type: 'text/calendar' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = 'ardd-schedule.ics';
       a.click();
+    }
+
+    function addToGoogleCalendar() {
+      if (selected.size === 0) return alert('Please select at least one session.');
+      [...selected].forEach(i => {
+        const session = schedule[i];
+        const title = encodeURIComponent(session.raw.replace(/\s+/g, ' ').trim().slice(0, 80));
+        const date = '20260901';
+        const timeClean = session.time.replace(':', '') + '00';
+        const start = `${date}T${timeClean}Z`;
+        const end = `${date}T${timeClean}Z`;
+        const details = encodeURIComponent('ARDD 2026 Session - David Rubenstein Treehouse, Harvard University');
+        const location = encodeURIComponent('David Rubenstein Treehouse, Harvard University, Boston MA');
+        const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${start}/${end}&details=${details}&location=${location}`;
+        window.open(url, '_blank');
+      });
     }
   </script>
 </body>
