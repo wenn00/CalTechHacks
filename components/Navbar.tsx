@@ -55,8 +55,8 @@ export default function Navbar() {
     await supabase.auth.signOut();
   };
 
-  // Hide on /login — showing "Sign In" on the login page would be redundant
-  if (pathname === '/login') return null;
+  // Figma-driven screens provide their own navigation/chrome.
+  if (pathname === '/login' || pathname?.startsWith('/onboarding') || pathname === '/directory') return null;
 
   return (
     <nav className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-6">

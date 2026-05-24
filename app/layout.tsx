@@ -8,6 +8,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "ARDD 2026",
   description: "Personalized conference navigator for ARDD 2026",
+  icons: {
+    icon: "/mycellium/logo.png",
+  },
 };
 
 export default function RootLayout({
