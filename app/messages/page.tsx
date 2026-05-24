@@ -79,13 +79,18 @@ function MessagesInner() {
   const api = useCallback(
     async <T,>(method: string, path: string, body?: unknown): Promise<{ ok: boolean; data: T | null }> => {
       if (!token) return { ok: false, data: null };
-      const res = await fetch(`${API}/api/messages${path}`, {
-        method,
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-      });
-      const json = await res.json().catch(() => null);
-      return { ok: res.ok, data: (json?.data ?? null) as T | null };
+      try {
+        const res = await fetch(`${API}/api/messages${path}`, {
+          method,
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: body !== undefined ? JSON.stringify(body) : undefined,
+        });
+        const json = await res.json().catch(() => null);
+        return { ok: res.ok, data: (json?.data ?? null) as T | null };
+      } catch (error) {
+        console.warn('messages api unavailable:', error);
+        return { ok: false, data: null };
+      }
     },
     [token],
   );
