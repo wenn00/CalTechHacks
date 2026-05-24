@@ -62,7 +62,8 @@ export default function Navbar() {
     pathname === '/directory' ||
     pathname === '/schedule' ||
     pathname === '/map' ||
-    pathname === '/videos'
+    pathname === '/videos' ||
+    pathname === '/profile'
   ) return null;
 
   return (

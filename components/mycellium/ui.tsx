@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 const navIconClass = 'h-5 w-5';
-type SidebarSection = 'directory' | 'matches' | 'schedule' | 'messages' | 'map' | 'videos';
+type SidebarSection = 'directory' | 'matches' | 'schedule' | 'messages' | 'map' | 'videos' | 'profile';
 
 type BrandRailProps = {
   children?: ReactNode;
@@ -203,7 +203,7 @@ export function AppSidebar({ view = 'directory', onViewChange, activeSection }: 
             />
           </nav>
         </div>
-        <div ref={accountRef} className={`relative hidden items-center lg:flex ${collapsed ? 'flex-col gap-3' : 'justify-between'}`}>
+        <div ref={accountRef} className={`relative hidden items-center md:flex ${collapsed ? 'flex-col gap-3' : 'justify-between'}`}>
           {accountOpen && (
             <AccountPopover
               collapsed={collapsed}
@@ -212,7 +212,7 @@ export function AppSidebar({ view = 'directory', onViewChange, activeSection }: 
               profile={profile}
               onOpenProfile={() => {
                 setAccountOpen(false);
-                router.push('/onboarding');
+                router.push('/profile');
               }}
               onSignOut={signOut}
             />
@@ -220,8 +220,11 @@ export function AppSidebar({ view = 'directory', onViewChange, activeSection }: 
 
           <button
             type="button"
-            aria-label="Open account"
-            onClick={() => setAccountOpen((open) => !open)}
+            aria-label="Open profile"
+            onClick={() => {
+              setAccountOpen(false);
+              router.push('/profile');
+            }}
             className="flex h-11 w-11 items-center justify-center rounded-full bg-[#deefec] text-sm font-semibold text-[#195c52] transition hover:bg-[#cfe7e3]"
           >
             {initials}
