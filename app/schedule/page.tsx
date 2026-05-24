@@ -129,6 +129,20 @@ function buildAgendaIcs(sessions: Session[]) {
   return `${lines.join('\r\n')}\r\n`;
 }
 
+function buildGoogleCalendarUrl(session: Session) {
+  const start = conferenceTimeToUtc(session.day, session.time);
+  const end = conferenceTimeToUtc(session.day, session.time, SESSION_DURATION_MINUTES);
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: session.title,
+    dates: `${formatUtcForIcs(start)}/${formatUtcForIcs(end)}`,
+    details: `ARDD 2026 session. Tags: ${session.tags.join(', ')}`,
+    location: session.room,
+  });
+
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
 export default function SchedulePage() {
   const [day, setDay] = useState<(typeof DAYS)[number]>('Day 1');
   const [selected, setSelected] = useState<string[]>([]);
@@ -152,6 +166,14 @@ export default function SchedulePage() {
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
+
+  const addToGoogleCalendar = () => {
+    if (!selectedSessions.length) return;
+
+    selectedSessions.forEach((session, index) => {
+      window.open(buildGoogleCalendarUrl(session), `mycellium-google-calendar-${index}`, 'noopener,noreferrer');
+    });
   };
 
   return (
@@ -233,9 +255,14 @@ export default function SchedulePage() {
                   <p className="text-sm leading-6 text-zinc-500">Select sessions to assemble your agenda.</p>
                 )}
               </div>
-              <MyButton className="mt-5 w-full" disabled={!selectedSessions.length} onClick={exportAgenda}>
-                Export Agenda
-              </MyButton>
+              <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                <MyButton className="w-full px-3 text-sm" disabled={!selectedSessions.length} onClick={exportAgenda}>
+                  Export Agenda
+                </MyButton>
+                <MyButton className="w-full px-3 text-sm" variant="secondary" disabled={!selectedSessions.length} onClick={addToGoogleCalendar}>
+                  Google Calendar
+                </MyButton>
+              </div>
             </aside>
           </div>
         </section>
