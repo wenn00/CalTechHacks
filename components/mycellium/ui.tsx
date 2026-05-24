@@ -141,8 +141,8 @@ export function AppSidebar({ view = 'directory', onViewChange, activeSection }: 
 
   return (
     <aside
-      className={`relative flex border-zinc-200 bg-white transition-[width] md:sticky md:top-0 md:h-screen md:min-h-screen md:w-[92px] md:border-r ${
-        collapsed ? 'lg:w-[92px]' : 'lg:w-[260px]'
+      className={`relative flex border-zinc-200 bg-white transition-[width] md:sticky md:top-0 md:h-screen md:min-h-screen md:border-r ${
+        collapsed ? 'md:w-[92px]' : 'md:w-[220px] lg:w-[260px]'
       }`}
     >
       <div
@@ -254,15 +254,17 @@ function SidebarButton({ active = false, collapsed = false, icon, label, classNa
       type="button"
       title={label}
       aria-label={label}
-      className={`flex h-12 min-w-12 items-center justify-center gap-3 rounded-lg px-3 text-[#0b2e28] transition hover:bg-[#eef7f5] disabled:cursor-not-allowed disabled:opacity-45 ${
-        collapsed ? 'lg:justify-center lg:px-3' : 'lg:justify-start lg:px-5'
+      className={`flex h-14 min-w-14 flex-col items-center justify-center gap-1 rounded-lg px-2 text-[#0b2e28] transition hover:bg-[#eef7f5] disabled:cursor-not-allowed disabled:opacity-45 md:h-12 md:min-w-12 md:flex-row md:gap-3 md:px-3 ${
+        collapsed ? 'md:justify-center md:px-3' : 'md:justify-start md:px-4 lg:px-5'
       } ${
         active ? 'bg-[#ddf2ef] font-bold text-[#4a9b8e]' : 'font-semibold'
       } ${className}`}
       {...props}
     >
       {icon}
-      <span className={collapsed ? 'hidden' : 'hidden whitespace-nowrap lg:inline'}>{label}</span>
+      <span className={collapsed ? 'hidden' : 'max-w-16 text-center text-[10px] leading-tight md:inline md:max-w-none md:text-left md:text-sm md:leading-normal'}>
+        {label}
+      </span>
     </button>
   );
 }
