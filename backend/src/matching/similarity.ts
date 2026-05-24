@@ -34,15 +34,20 @@ export function cosine(a: number[], b: number[]): number {
  * Medium for peers. Low for unrelated pairings.
  */
 const STAGE_MATRIX: Record<string, Record<string, number>> = {
-  investor:             { founder: 1.0, early_career_researcher: 0.7, mid_career_researcher: 0.6, professor: 0.5, postdoc: 0.4, graduate_student: 0.3, industry_professional: 0.7, senior_researcher: 0.6 },
-  founder:              { investor: 1.0, professor: 0.8, mid_career_researcher: 0.7, senior_researcher: 0.7, industry_professional: 0.8, early_career_researcher: 0.5, postdoc: 0.4, graduate_student: 0.3 },
-  professor:            { founder: 0.8, postdoc: 0.9, graduate_student: 0.7, early_career_researcher: 0.8, mid_career_researcher: 0.7, senior_researcher: 0.6, investor: 0.5, industry_professional: 0.6 },
-  postdoc:              { professor: 0.9, graduate_student: 0.7, early_career_researcher: 0.7, mid_career_researcher: 0.6, founder: 0.4, industry_professional: 0.6, senior_researcher: 0.6, investor: 0.4 },
-  graduate_student:     { professor: 0.7, postdoc: 0.7, early_career_researcher: 0.6, mid_career_researcher: 0.5, senior_researcher: 0.5, founder: 0.3, industry_professional: 0.4, investor: 0.3 },
-  early_career_researcher: { professor: 0.8, postdoc: 0.7, mid_career_researcher: 0.7, senior_researcher: 0.6, founder: 0.5, industry_professional: 0.6, investor: 0.6, graduate_student: 0.6 },
-  mid_career_researcher:   { professor: 0.7, senior_researcher: 0.7, early_career_researcher: 0.7, founder: 0.7, industry_professional: 0.7, investor: 0.6, postdoc: 0.6, graduate_student: 0.5 },
-  senior_researcher:    { professor: 0.6, founder: 0.7, mid_career_researcher: 0.7, industry_professional: 0.7, investor: 0.6, early_career_researcher: 0.6, postdoc: 0.6, graduate_student: 0.5 },
-  industry_professional:{ founder: 0.8, investor: 0.7, professor: 0.6, senior_researcher: 0.7, mid_career_researcher: 0.7, early_career_researcher: 0.6, postdoc: 0.6, graduate_student: 0.4 },
+  // Standard values
+  investor:             { founder: 1.0, executive: 0.8, pi: 0.5, senior: 0.6, postdoc: 0.4, phd_student: 0.3, early_career_researcher: 0.7, mid_career_researcher: 0.6, professor: 0.5, industry_professional: 0.7, senior_researcher: 0.6 },
+  founder:              { investor: 1.0, executive: 0.9, pi: 0.8, senior: 0.7, industry_professional: 0.8, postdoc: 0.4, phd_student: 0.3, professor: 0.8, early_career_researcher: 0.5, mid_career_researcher: 0.7 },
+  professor:            { founder: 0.8, pi: 0.7, postdoc: 0.9, phd_student: 0.7, senior: 0.6, executive: 0.6, early_career_researcher: 0.8, mid_career_researcher: 0.7, senior_researcher: 0.6, investor: 0.5 },
+  postdoc:              { professor: 0.9, pi: 0.9, phd_student: 0.7, senior: 0.6, executive: 0.5, early_career_researcher: 0.7, mid_career_researcher: 0.6, investor: 0.4, founder: 0.4 },
+  // Actual DB values
+  pi:                   { postdoc: 0.9, phd_student: 0.7, senior: 0.6, executive: 0.6, founder: 0.8, investor: 0.5, pi: 0.6 },
+  executive:            { investor: 0.8, founder: 0.9, pi: 0.6, senior: 0.7, postdoc: 0.5, phd_student: 0.4, executive: 0.65 },
+  senior:               { investor: 0.6, founder: 0.7, pi: 0.6, executive: 0.7, postdoc: 0.6, phd_student: 0.5, senior: 0.6 },
+  phd_student:          { pi: 0.7, postdoc: 0.7, senior: 0.5, executive: 0.4, founder: 0.3, investor: 0.3, phd_student: 0.5 },
+  early_career_researcher: { professor: 0.8, pi: 0.8, postdoc: 0.7, senior: 0.6, founder: 0.5, executive: 0.6, investor: 0.6 },
+  mid_career_researcher:   { professor: 0.7, pi: 0.7, senior: 0.7, founder: 0.7, executive: 0.7, investor: 0.6, postdoc: 0.6 },
+  senior_researcher:    { professor: 0.6, pi: 0.6, founder: 0.7, senior: 0.7, executive: 0.7, investor: 0.6 },
+  industry_professional:{ founder: 0.8, investor: 0.7, pi: 0.6, senior: 0.7, executive: 0.8, postdoc: 0.6 },
 };
 
 export function stageCompatibility(stageA?: string | null, stageB?: string | null): number {

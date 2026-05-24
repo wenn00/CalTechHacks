@@ -91,7 +91,7 @@ export async function scorePair(a: Profile, b: Profile, pubKeywordsMap: Map<stri
 
 export async function computeMatchesForUser(userId: string): Promise<number> {
   const profiles = await prisma.profiles.findMany({
-    where: { onboarding_complete: true },
+    where: { onboarding_complete: { not: false } },
     select: {
       id: true, name: true, research_keywords: true, research_area: true,
       career_stage: true, goals: true, session_interests: true,
