@@ -57,8 +57,8 @@ export default function MapPage() {
           </header>
 
           <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-            <section className="min-h-[560px] overflow-auto rounded-lg border border-zinc-200 bg-[#f8fbfa] p-4">
-              <div className="relative mx-auto w-full min-w-[760px] max-w-[1080px]">
+            <section className="min-h-[420px] overflow-hidden rounded-lg border border-zinc-200 bg-[#f8fbfa] p-3 sm:min-h-[560px] sm:p-4">
+              <div className="relative mx-auto w-full max-w-[1080px]">
                 <img
                   src={FLOOR_PLAN_SRC[floor]}
                   alt={`${floor} venue floor plan`}
@@ -68,7 +68,7 @@ export default function MapPage() {
                   <button
                     key={room.name}
                     type="button"
-                    className={`absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full border bg-white/95 px-3 py-2 text-left text-xs font-semibold shadow-sm transition hover:scale-105 ${
+                    className={`absolute flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border bg-white/95 p-2 text-left text-xs font-semibold shadow-sm transition hover:scale-105 sm:h-auto sm:w-auto sm:gap-2 sm:px-3 sm:py-2 ${
                       room.type === 'Facility'
                         ? 'border-[#f59e0b] text-[#8a5a00]'
                         : room.type === 'Common Area'
@@ -82,7 +82,7 @@ export default function MapPage() {
                         room.type === 'Facility' ? 'bg-[#f59e0b]' : room.type === 'Common Area' ? 'bg-[#4a9b8e]' : 'bg-[#195c52]'
                       }`}
                     />
-                    <span>{room.name}</span>
+                    <span className="hidden whitespace-nowrap sm:inline">{room.name}</span>
                   </button>
                 ))}
               </div>
