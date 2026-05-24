@@ -1,15 +1,10 @@
-import Link from 'next/link';
-
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <h1 className="text-4xl font-bold">ARDD 2026 Assistant</h1>
-        <div className="flex gap-4">
-          <Link href="/login" className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">Sign In</Link>
-          <Link href="/directory" className="px-4 py-2 bg-white border border-gray-300 rounded-lg font-semibold hover:bg-gray-50">Attendee Directory</Link>
-        </div>
-      </div>
+    <main className="flex min-h-[calc(100vh-60px)] flex-col items-center justify-center p-8 text-center">
+      <h1 className="text-5xl font-bold mb-4">ARDD 2026 Assistant</h1>
+      <p className="text-lg text-gray-600 max-w-xl">
+        Your personalized navigator for the Aging Research & Drug Discovery conference.
+      </p>
     </main>
   );
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import Link from "next/link";
 import "./globals.css";
+import Navbar from "@/components/Navbar";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -18,14 +18,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <nav className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-6">
-          <Link href="/" className="font-bold text-gray-900 text-lg">🧬 ARDD 2026</Link>
-          <Link href="/directory" className="text-sm text-gray-600 hover:text-gray-900 font-medium">Attendee Directory</Link>
-          <Link href="/onboarding" className="text-sm text-gray-600 hover:text-gray-900 font-medium">Onboarding</Link>
-          <div className="ml-auto">
-            <Link href="/login" className="text-sm px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700">Sign In</Link>
-          </div>
-        </nav>
+        <Navbar />
         {children}
       </body>
     </html>
