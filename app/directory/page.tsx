@@ -295,6 +295,14 @@ export default function DirectoryPage() {
     setMatchStatus('idle');
   };
 
+  const openPublicProfile = (person: NetworkPerson) => {
+    if (person.id.startsWith('demo-')) {
+      openPerson(person);
+      return;
+    }
+    router.push(`/profile/${person.id}`);
+  };
+
   const recordConnect = async () => {
     if (!selected) return;
     if (selected.id.startsWith('demo-')) {
@@ -388,8 +396,19 @@ export default function DirectoryPage() {
               />
 
               <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-                <NetworkGraph people={people} loading={isGraphLoading} selectedId={selected?.id} onSelect={openPerson} />
-                <PeopleList people={people} loading={isGraphLoading} selectedId={selected?.id} onSelect={openPerson} />
+                <NetworkGraph
+                  people={people}
+                  loading={isGraphLoading}
+                  selectedId={selected?.id}
+                  onOpenProfile={openPublicProfile}
+                />
+                <PeopleList
+                  people={people}
+                  loading={isGraphLoading}
+                  selectedId={selected?.id}
+                  onSelect={openPerson}
+                  onOpenProfile={openPublicProfile}
+                />
               </div>
 
               {view === 'directory' && (meta.totalPages ?? 1) > 1 && (
@@ -426,6 +445,7 @@ export default function DirectoryPage() {
           mode={drawerMode}
           setMode={setDrawerMode}
           onClose={() => setSelected(null)}
+          onOpenProfile={() => openPublicProfile(selected)}
           onMessage={recordConnect}
           matchStatus={matchStatus}
         />
@@ -546,11 +566,13 @@ function PeopleList({
   loading,
   selectedId,
   onSelect,
+  onOpenProfile,
 }: {
   people: NetworkPerson[];
   loading: boolean;
   selectedId?: string;
   onSelect: (person: NetworkPerson) => void;
+  onOpenProfile: (person: NetworkPerson) => void;
 }) {
   if (loading) {
     return (
@@ -585,9 +607,17 @@ function PeopleList({
               }`}
             >
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#deefec] text-sm font-semibold text-[#195c52]">
-                  {initials(person.name)}
-                </div>
+                <button
+                  type="button"
+                  aria-label={`Open ${person.name} profile`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onOpenProfile(person);
+                  }}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#deefec] text-sm font-semibold text-[#195c52] transition hover:ring-4 hover:ring-[#4a9b8e]/20"
+                >
+                  {person.photo_url ? <img src={person.photo_url} alt="" className="h-full w-full object-cover" /> : initials(person.name)}
+                </button>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className="truncate text-sm font-semibold text-black">{person.name}</p>
@@ -614,12 +644,12 @@ function NetworkGraph({
   people,
   loading,
   selectedId,
-  onSelect,
+  onOpenProfile,
 }: {
   people: NetworkPerson[];
   loading: boolean;
   selectedId?: string;
-  onSelect: (person: NetworkPerson) => void;
+  onOpenProfile: (person: NetworkPerson) => void;
 }) {
   const nodes = people.slice(0, NODE_POSITIONS.length);
 
@@ -656,7 +686,7 @@ function NetworkGraph({
           <button
             key={`${person.id}-${index}`}
             type="button"
-            onClick={() => onSelect(person)}
+            onClick={() => onOpenProfile(person)}
             className={`absolute z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-center font-semibold shadow-sm transition hover:scale-105 ${
               isPrimary ? 'bg-[#195c52] text-white' : index % 3 === 0 ? 'bg-[#deefec] text-[#4a9b8e]' : 'bg-[#9fd5cd] text-[#195c52]'
             } ${isSelected ? 'ring-4 ring-[#4a9b8e]/25' : ''}`}
@@ -667,9 +697,9 @@ function NetworkGraph({
               height: position.size,
               fontSize: isPrimary ? 28 : 18,
             }}
-            title={person.name}
+            title={`Open ${person.name} profile`}
           >
-            {initials(person.name)}
+            {person.photo_url ? <img src={person.photo_url} alt="" className="h-full w-full rounded-full object-cover" /> : initials(person.name)}
             {typeof person.score === 'number' && (
               <span className="absolute -right-3 -top-2 rounded-full bg-[#195c52] px-2 py-1 text-[11px] font-bold text-white">
                 {formatScore(person.score)}
@@ -687,6 +717,7 @@ function ProfileDrawer({
   mode,
   setMode,
   onClose,
+  onOpenProfile,
   onMessage,
   matchStatus,
 }: {
@@ -694,6 +725,7 @@ function ProfileDrawer({
   mode: 'match' | 'profile';
   setMode: (mode: 'match' | 'profile') => void;
   onClose: () => void;
+  onOpenProfile: () => void;
   onMessage: () => void;
   matchStatus: 'idle' | 'connecting' | 'connected' | 'error';
 }) {
@@ -706,13 +738,14 @@ function ProfileDrawer({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start gap-5 px-6 py-7">
-          {person.photo_url ? (
-            <img src={person.photo_url} alt={person.name} className="h-[77px] w-[81px] rounded-full object-cover" />
-          ) : (
-            <div className="flex h-[77px] w-[81px] items-center justify-center rounded-full bg-[#deefec] text-xl font-semibold text-[#195c52]">
-              {initials(person.name)}
-            </div>
-          )}
+          <button
+            type="button"
+            aria-label={`Open ${person.name} profile`}
+            onClick={onOpenProfile}
+            className="flex h-[77px] w-[81px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#deefec] text-xl font-semibold text-[#195c52] transition hover:ring-4 hover:ring-[#4a9b8e]/20"
+          >
+            {person.photo_url ? <img src={person.photo_url} alt="" className="h-full w-full object-cover" /> : initials(person.name)}
+          </button>
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-2xl font-bold leading-tight text-black">{person.name}</h2>
             <p className="mt-2 text-base leading-7 text-black">

@@ -63,7 +63,7 @@ export default function Navbar() {
     pathname === '/schedule' ||
     pathname === '/map' ||
     pathname === '/videos' ||
-    pathname === '/profile'
+    pathname?.startsWith('/profile')
   ) return null;
 
   return (
