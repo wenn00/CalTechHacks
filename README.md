@@ -37,37 +37,97 @@ The manual `/ardd digest` command produces a preview only — it does **not** po
 
 ### Setup walkthrough
 
-1. **Create the Slack app from manifest.** Go to <https://api.slack.com/apps> → *Create New App* → *From an app manifest* → pick your workspace → paste `slack/app-manifest.yaml`.
-2. **Install to Workspace** to obtain the Bot Token (`xoxb-…`).
-3. **Enable Socket Mode** → generate an App-Level Token (`xapp-…`, scope `connections:write`).
-4. **Invite the bot to a channel:** `/invite @ardd`. Copy that channel's ID.
-5. **Identify admin Slack user IDs.** Slack profile → *More* → *Copy member ID*.
-6. **Fill `backend/.env`:**
-   ```
-   SLACK_BOT_TOKEN=xoxb-...
-   SLACK_APP_TOKEN=xapp-...
-   SLACK_DIGEST_CHANNEL_ID=C...
-   ADMIN_SLACK_USER_IDS=U123,U456
-   CONFERENCE_TIMEZONE=America/Los_Angeles
-   CONFERENCE_START_DATE_KEY=2026-09-01
-   ENABLE_SLACK_BOT=true
-   ENABLE_DAILY_DIGEST_CRON=true
-   # DEMO_NOW_ISO=2026-09-01T10:15:00-07:00   # uncomment for off-day demos
-   ```
-   `DATABASE_URL` and `DIRECT_URL` must also point at the Supabase Postgres connection string (substitute `[YOUR-PASSWORD]`).
-7. **Run database migrations and seed.** From `backend/`:
-   ```bash
-   npx prisma db push
-   npx tsx prisma/seed-bot-demo.ts
-   ```
-   If the existing `sessions` table already has rows, run `npx tsx prisma/backfill-conference-dates.ts` afterwards to populate `conference_date_key` and `conference_day`, then drop the `?` on those columns in `schema.prisma` and re-run `npx prisma db push`.
-8. **Start the backend.** From `backend/`:
-   ```bash
-   npm install
-   ENABLE_SLACK_BOT=true npm run dev
-   ```
-   You should see: `Slack bot connected via Socket Mode`.
-9. **Smoke test.** In your demo Slack channel: `/ardd help`, then `/ardd now`.
+Run every step from `backend/` unless noted otherwise.
+
+#### 1. Create the Slack app
+
+1. Open <https://api.slack.com/apps> → **Create New App** → **From an app manifest**.
+2. Pick your workspace → paste the contents of `slack/app-manifest.yaml` → **Create**.
+3. **Install to Workspace** → copy the **Bot User OAuth Token** (`xoxb-…`).
+4. **Basic Information** → **App-Level Tokens** → **Generate Token and Scopes** → add scope `connections:write` → copy the token (`xapp-…`).
+5. In Slack: `/invite @ardd` into your demo channel. Copy the channel ID from the URL (`…/archives/C0XXXXX`).
+6. In Slack: click your profile → **More (⋯)** → **Copy member ID** for each admin (`U0XXXXX`). Commas separate multiple admins.
+
+#### 2. Get the Supabase connection string
+
+Supabase's **direct** connection (`db.<project>.supabase.co`) is **IPv6-only** since 2024 and fails on most home / office / CI networks. Always use the **Supavisor pooler** instead.
+
+In Supabase Dashboard → look for the **Connect** button (top of the page) or the Database section in the sidebar. You'll see two pooler URIs:
+
+- **Transaction pooler** (port `6543`) → use for `DATABASE_URL` at runtime
+- **Session pooler** (port `5432`) → use for `DIRECT_URL` for Prisma migrations
+
+Username is `postgres.<project-ref>` (not just `postgres`). Append `?pgbouncer=true&connection_limit=1` to `DATABASE_URL` — the transaction pooler does not support Prisma's prepared statements without it.
+
+#### 3. Fill `backend/.env`
+
+Copy `backend/.env.example` to `backend/.env`, then fill in the real values:
+
+```env
+# Database — pooler URLs from Supabase (Section 2 above).
+DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-1-<region>.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
+DIRECT_URL=postgresql://postgres.<project-ref>:<password>@aws-1-<region>.pooler.supabase.com:5432/postgres
+
+SUPABASE_URL=https://<project-ref>.supabase.co
+
+# Slack — tokens from Section 1.
+SLACK_BOT_TOKEN=xoxb-…
+SLACK_APP_TOKEN=xapp-…
+SLACK_DIGEST_CHANNEL_ID=C0XXXXX
+ADMIN_SLACK_USER_IDS=U0XXXXX,U0YYYYY
+
+CONFERENCE_TIMEZONE=America/Los_Angeles
+CONFERENCE_START_DATE_KEY=2026-09-01
+
+ENABLE_SLACK_BOT=true
+ENABLE_DAILY_DIGEST_CRON=true
+
+# Uncomment for deterministic demo time when the wall clock is not the conference day.
+# DEMO_NOW_ISO=2026-09-01T10:15:00-07:00
+```
+
+> **The dev server reads `.env` once at startup.** Any env change (new admin, different channel, new tokens) requires a restart to take effect — `tsx watch` only watches source files.
+
+#### 4. Install dependencies, push schema, seed
+
+```bash
+npm install
+npx prisma generate                   # regenerate Prisma client for the new models
+npx prisma db push                    # apply schema to Supabase (additive, non-destructive)
+npx tsx prisma/seed-bot-demo.ts       # 3 tracks, 5 synthetic speakers, 10 sessions, 3 announcements, 5 impressions
+```
+
+If the existing `sessions` table already had rows from a previous setup, run `npx tsx prisma/backfill-conference-dates.ts` after `db push` to populate `conference_date_key` and `conference_day`. The columns are NOT NULL — `db push` will refuse if any row is missing them.
+
+#### 5. Start the backend
+
+```bash
+ENABLE_SLACK_BOT=true ENABLE_DAILY_DIGEST_CRON=true npm run dev
+```
+
+You should see:
+
+```
+✓ Database connected
+✓ Server running on http://localhost:3001
+Slack bot connected via Socket Mode
+[digest cron] scheduled "0 18 * * *" in America/Los_Angeles → channel C0XXXXX
+```
+
+#### 6. Smoke test in Slack
+
+Run from the main message composer (Slack does not deliver developer slash commands inside threads):
+
+```
+/ardd help
+/ardd schedule day1
+/ardd speaker Demo
+/ardd note          ← opens a modal; pick a session, type a note, submit
+/ardd announce Lunch moved to 12:30   ← needs ADMIN_SLACK_USER_IDS to include your member ID
+/ardd digest        ← ephemeral preview only; does not post
+```
+
+`/ardd now` will be empty unless the system clock falls inside a seeded session. To exercise it on a non-conference day, uncomment `DEMO_NOW_ISO` in `.env` and restart the bot.
 
 ### Demo data
 
