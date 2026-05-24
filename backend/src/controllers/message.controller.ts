@@ -41,6 +41,7 @@ export async function getMessages(req: AuthRequest, res: Response, next: NextFun
 export async function sendMessage(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const message = await svc.saveMessage(req.params.id, req.user!.id, req.body.content);
+    if (!message) return fail(res, "Conversation not found or access denied", 404);
     ok(res, message, 201);
   } catch (err) { next(err); }
 }

@@ -160,7 +160,15 @@ export async function getMessages(conversationId: string, myId: string, cursor?:
   };
 }
 
+// Returns null when the sender is not a participant in the conversation.
+// Callers must treat null as a 403/404 — never trust the REST or socket
+// caller's claim of conversation_id without verifying membership here.
 export async function saveMessage(conversationId: string, senderId: string, content: string) {
+  const member = await prisma.conversation_participants.findUnique({
+    where: { conversation_id_profile_id: { conversation_id: conversationId, profile_id: senderId } },
+  });
+  if (!member) return null;
+
   const [message] = await Promise.all([
     prisma.messages.create({
       data: { conversation_id: conversationId, sender_id: senderId, content },
