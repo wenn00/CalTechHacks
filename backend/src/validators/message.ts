@@ -5,7 +5,9 @@ export const createConversationSchema = z.object({
 });
 
 export const sendMessageSchema = z.object({
-  content: z.string().min(1).max(5000).trim(),
+  // .trim() must run before min(1) so whitespace-only input is rejected
+  // instead of being accepted and silently stored as an empty string.
+  content: z.string().trim().min(1).max(5000),
 });
 
 export const messagesQuerySchema = z.object({
