@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ARDD Video Library</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f1117;
+      color: #f0f0f0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .header {
+      padding: 16px 30px;
+      background: #1a1d27;
+      border-bottom: 1px solid #2e3148;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    h1 { font-size: 1.4rem; color: #7c83f5; }
+    .subtitle { color: #888; font-size: 0.82rem; }
+    .back-btn {
+      margin-left: auto;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid #7c83f5;
+      background: transparent;
+      color: #7c83f5;
+      font-size: 0.85rem;
+      text-decoration: none;
+    }
+
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 300px;
+      flex-shrink: 0;
+      background: #1a1d27;
+      border-right: 1px solid #2e3148;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .sidebar-toolbar {
+      padding: 14px 16px;
+      border-bottom: 1px solid #2e3148;
+      flex-shrink: 0;
+    }
+    .search-input {
+      width: 100%;
+      padding: 8px 12px;
+      background: #0f1117;
+      border: 1px solid #2e3148;
+      border-radius: 8px;
+      color: #f0f0f0;
+      font-size: 0.85rem;
+    }
+    .video-list { overflow-y: auto; flex: 1; }
+    .video-item {
+      padding: 14px 16px;
+      border-bottom: 1px solid #2e3148;
+      cursor: pointer;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      transition: background 0.15s;
+    }
+    .video-item:hover { background: #0f1117; }
+    .video-item.active { background: #1e2035; border-left: 3px solid #7c83f5; }
+    .video-thumb {
+      width: 88px;
+      height: 52px;
+      border-radius: 6px;
+      object-fit: cover;
+      flex-shrink: 0;
+      background: #2e3148;
+    }
+    .video-info { flex: 1; min-width: 0; }
+    .video-title {
+      font-size: 0.8rem;
+      color: #f0f0f0;
+      line-height: 1.4;
+      margin-bottom: 4px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .video-speaker { font-size: 0.7rem; color: #666; }
+
+    /* Player area — scrollable */
+    .player-area {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Video embed — fixed 16:9 ratio */
+    .player-wrapper {
+      position: relative;
+      width: 100%;
+      padding-top: 56.25%;
+      background: #000;
+      flex-shrink: 0;
+    }
+    .player-wrapper iframe {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      border: none;
+    }
+
+    /* Info + comments below video */
+    .player-body { padding: 24px; }
+    .player-title {
+      font-size: 1.05rem;
+      color: #f0f0f0;
+      margin-bottom: 8px;
+      line-height: 1.4;
+    }
+    .player-meta {
+      font-size: 0.82rem;
+      color: #888;
+      margin-bottom: 24px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .badge {
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      background: #7c83f5;
+      color: white;
+    }
+
+    /* Reactions */
+    .section-title {
+      font-size: 0.82rem;
+      color: #7c83f5;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+    .emoji-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+    .emoji-btn {
+      padding: 7px 14px;
+      background: #1a1d27;
+      border: 1px solid #2e3148;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      color: #ccc;
+      transition: border-color 0.15s;
+    }
+    .emoji-btn:hover { border-color: #7c83f5; }
+    .emoji-btn.reacted { border-color: #7c83f5; background: #2e3148; color: white; }
+
+    /* Comment input */
+    .comment-box { margin-bottom: 20px; }
+    .comment-inputs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 0;
+    }
+    .name-input {
+      width: 120px;
+      flex-shrink: 0;
+      padding: 9px 12px;
+      background: #1a1d27;
+      border: 1px solid #2e3148;
+      border-radius: 8px;
+      color: #f0f0f0;
+      font-size: 0.82rem;
+    }
+    .comment-input {
+      flex: 1;
+      padding: 9px 12px;
+      background: #1a1d27;
+      border: 1px solid #2e3148;
+      border-radius: 8px;
+      color: #f0f0f0;
+      font-size: 0.82rem;
+    }
+    .post-btn {
+      padding: 9px 18px;
+      background: #7c83f5;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .post-btn:hover { background: #6470f0; }
+
+    /* Comments */
+    .comments-list { display: flex; flex-direction: column; gap: 10px; }
+    .comment-item {
+      background: #1a1d27;
+      border: 1px solid #2e3148;
+      border-radius: 10px;
+      padding: 12px 16px;
+    }
+    .comment-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .comment-name { font-size: 0.82rem; color: #7c83f5; font-weight: 600; }
+    .comment-time { font-size: 0.7rem; color: #555; margin-left: auto; }
+    .comment-text { font-size: 0.83rem; color: #ccc; line-height: 1.5; }
+    .empty-msg { color: #555; font-size: 0.82rem; padding: 4px 0; }
+
+    /* Empty state */
+    .no-video {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #555;
+      gap: 12px;
+      font-size: 0.95rem;
+    }
+    .no-video span { font-size: 3rem; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>🎬 ARDD Video Library</h1>
+    <p class="subtitle">Talks from ARDD 2025 — watch, react, and comment</p>
+  </div>
+  <a href="/" class="back-btn">← Home</a>
+</div>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="sidebar-toolbar">
+      <input class="search-input" type="text" placeholder="Search talks..." oninput="filterVideos(this.value)" />
+    </div>
+    <div class="video-list" id="video-list"></div>
+  </div>
+
+  <div class="player-area" id="player-area">
+    <div class="no-video">
+      <span>🎬</span>
+      <p>Select a talk to watch</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const videos = [
+  { id: 'GB2G1R7ATJw', title: 'Joe Betts-LaCroix: AI for rejuvenation & replacement therapies', speaker: 'Joe Betts-LaCroix · Retro Biosciences' },
+  { id: '2w-vcI-nYwc', title: 'Nir Barzilai: Repurposed drugs', speaker: 'Nir Barzilai · Albert Einstein College of Medicine' },
+  { id: 'MHIyEBApmqA', title: 'Andrea Olsen: yHLMS', speaker: 'Andrea Olsen · Caltech' },
+  { id: '2D2CD0gnAYM', title: 'Andrea Maier: Epigenetic clocks Working group', speaker: 'Andrea Maier · National University of Singapore' },
+  { id: 'S_iificYy5o', title: 'James Kirkland: Senolytics', speaker: 'James Kirkland · Kogod Center on Aging' },
+];
+
+const comments = {};
+const emojiReactions = {};
+let currentSearch = '';
+let currentIndex = null;
+
+const EMOJIS = [
+  { emoji: '👍', label: 'Like' },
+  { emoji: '👏', label: 'Applause' },
+];
+
+function getFiltered() {
+  return videos.filter(v =>
+    v.title.toLowerCase().includes(currentSearch.toLowerCase()) ||
+    v.speaker.toLowerCase().includes(currentSearch.toLowerCase())
+  );
+}
+
+function renderList() {
+  const list = document.getElementById('video-list');
+  list.innerHTML = '';
+  getFiltered().forEach(v => {
+    const i = videos.indexOf(v);
+    const div = document.createElement('div');
+    div.className = 'video-item' + (currentIndex === i ? ' active' : '');
+    div.onclick = () => playVideo(i, div);
+    div.innerHTML = `
+      <img class="video-thumb" src="https://img.youtube.com/vi/${v.id}/mqdefault.jpg" alt="" />
+      <div class="video-info">
+        <div class="video-title">${v.title}</div>
+        <div class="video-speaker">${v.speaker}</div>
+      </div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+function playVideo(index, clickedEl) {
+  currentIndex = index;
+  const v = videos[index];
+  if (!comments[v.id]) comments[v.id] = [];
+  if (!emojiReactions[v.id]) {
+    emojiReactions[v.id] = {};
+    EMOJIS.forEach(e => emojiReactions[v.id][e.emoji] = { count: 0, reacted: false });
+  }
+  document.querySelectorAll('.video-item').forEach(el => el.classList.remove('active'));
+  if (clickedEl) clickedEl.classList.add('active');
+
+  const area = document.getElementById('player-area');
+  area.innerHTML = `
+    <div class="player-wrapper">
+      <iframe src="https://www.youtube.com/embed/${v.id}?autoplay=1" allowfullscreen allow="autoplay"></iframe>
+    </div>
+    <div class="player-body">
+      <div class="player-title">${v.title}</div>
+      <div class="player-meta">
+        <span class="badge">ARDD 2025</span>
+        <span>${v.speaker}</span>
+      </div>
+
+      <div class="section-title">⚡ React to this talk</div>
+      <div class="emoji-bar" id="emoji-bar-${v.id}"></div>
+
+      <div class="section-title">💬 Comments</div>
+      <div class="comment-box">
+        <div class="comment-inputs">
+          <input class="name-input" id="name-input" type="text" placeholder="Your name" />
+          <input class="comment-input" id="comment-input" type="text" placeholder="Add a comment or note..." onkeydown="if(event.key==='Enter') postComment('${v.id}')" />
+          <button class="post-btn" onclick="postComment('${v.id}')">Post</button>
+        </div>
+      </div>
+      <div class="comments-list" id="comments-list-${v.id}"></div>
+    </div>
+  `;
+
+  area.scrollTop = 0;
+  renderEmojiBar(v.id);
+  renderComments(v.id);
+}
+
+function renderEmojiBar(videoId) {
+  const bar = document.getElementById(`emoji-bar-${videoId}`);
+  if (!bar) return;
+  bar.innerHTML = EMOJIS.map(e => {
+    const d = emojiReactions[videoId][e.emoji];
+    return `<button class="emoji-btn ${d.reacted ? 'reacted' : ''}" onclick="toggleEmoji('${videoId}', '${e.emoji}')">
+      ${e.emoji} ${d.count > 0 ? d.count + ' ' : ''}${e.label}
+    </button>`;
+  }).join('');
+}
+
+function toggleEmoji(videoId, emoji) {
+  const d = emojiReactions[videoId][emoji];
+  d.reacted = !d.reacted;
+  d.count += d.reacted ? 1 : -1;
+  renderEmojiBar(videoId);
+}
+
+function postComment(videoId) {
+  const name = document.getElementById('name-input').value.trim() || 'Anonymous';
+  const text = document.getElementById('comment-input').value.trim();
+  if (!text) return;
+  const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  comments[videoId].unshift({ name, text, time });
+  document.getElementById('comment-input').value = '';
+  renderComments(videoId);
+}
+
+function renderComments(videoId) {
+  const list = document.getElementById(`comments-list-${videoId}`);
+  if (!list) return;
+  if (comments[videoId].length === 0) {
+    list.innerHTML = '<p class="empty-msg">No comments yet. Be the first!</p>';
+    return;
+  }
+  list.innerHTML = comments[videoId].map(c => `
+    <div class="comment-item">
+      <div class="comment-header">
+        <span class="comment-name">${c.name}</span>
+        <span class="comment-time">${c.time}</span>
+      </div>
+      <div class="comment-text">${c.text}</div>
+    </div>
+  `).join('');
+}
+
+function filterVideos(q) {
+  currentSearch = q;
+  renderList();
+}
+
+renderList();
+</script>
+</body>
+</html>
