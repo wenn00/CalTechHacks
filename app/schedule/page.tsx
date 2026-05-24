@@ -4,8 +4,24 @@ import { useState } from 'react';
 import { AppSidebar, MyButton, Tag } from '@/components/mycellium/ui';
 
 const DAYS = ['Day 1', 'Day 2', 'Day 3'] as const;
+const DAY_DATE_KEYS: Record<(typeof DAYS)[number], string> = {
+  'Day 1': '2026-09-01',
+  'Day 2': '2026-09-02',
+  'Day 3': '2026-09-03',
+};
+const CONFERENCE_TIMEZONE_LABEL = 'America/Los_Angeles';
+const CONFERENCE_UTC_OFFSET_MINUTES = -7 * 60;
+const SESSION_DURATION_MINUTES = 60;
 
-const SESSIONS = [
+type Session = {
+  day: (typeof DAYS)[number];
+  time: string;
+  title: string;
+  room: string;
+  tags: string[];
+};
+
+const SESSIONS: Session[] = [
   {
     day: 'Day 1',
     time: '09:00',
@@ -50,13 +66,92 @@ const SESSIONS = [
   },
 ];
 
+function escapeIcsText(value: string) {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/\n/g, '\\n')
+    .replace(/,/g, '\\,')
+    .replace(/;/g, '\\;');
+}
+
+function formatUtcForIcs(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return [
+    date.getUTCFullYear(),
+    pad(date.getUTCMonth() + 1),
+    pad(date.getUTCDate()),
+    'T',
+    pad(date.getUTCHours()),
+    pad(date.getUTCMinutes()),
+    pad(date.getUTCSeconds()),
+    'Z',
+  ].join('');
+}
+
+function conferenceTimeToUtc(day: (typeof DAYS)[number], time: string, addMinutes = 0) {
+  const [year, month, date] = DAY_DATE_KEYS[day].split('-').map(Number);
+  const [hour, minute] = time.split(':').map(Number);
+  const utcMs = Date.UTC(year, month - 1, date, hour, minute) - CONFERENCE_UTC_OFFSET_MINUTES * 60_000;
+  return new Date(utcMs + addMinutes * 60_000);
+}
+
+function buildAgendaIcs(sessions: Session[]) {
+  const now = formatUtcForIcs(new Date());
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Mycellium ARDD 2026//Agenda Export//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'X-WR-CALNAME:Mycellium ARDD 2026 Agenda',
+    `X-WR-TIMEZONE:${CONFERENCE_TIMEZONE_LABEL}`,
+  ];
+
+  sessions.forEach((session, index) => {
+    const start = conferenceTimeToUtc(session.day, session.time);
+    const end = conferenceTimeToUtc(session.day, session.time, SESSION_DURATION_MINUTES);
+    const slug = session.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:mycellium-${session.day.replace(/\s+/g, '').toLowerCase()}-${slug || index}@ardd2026`,
+      `DTSTAMP:${now}`,
+      `DTSTART:${formatUtcForIcs(start)}`,
+      `DTEND:${formatUtcForIcs(end)}`,
+      `SUMMARY:${escapeIcsText(session.title)}`,
+      `DESCRIPTION:${escapeIcsText(`ARDD 2026 session. Tags: ${session.tags.join(', ')}`)}`,
+      `LOCATION:${escapeIcsText(session.room)}`,
+      'END:VEVENT',
+    );
+  });
+
+  lines.push('END:VCALENDAR');
+  return `${lines.join('\r\n')}\r\n`;
+}
+
 export default function SchedulePage() {
   const [day, setDay] = useState<(typeof DAYS)[number]>('Day 1');
   const [selected, setSelected] = useState<string[]>([]);
   const visibleSessions = SESSIONS.filter((session) => session.day === day);
+  const selectedSessions = SESSIONS.filter((session) => selected.includes(session.title));
 
   const toggleSession = (title: string) => {
     setSelected((current) => (current.includes(title) ? current.filter((item) => item !== title) : [...current, title]));
+  };
+
+  const exportAgenda = () => {
+    if (!selectedSessions.length) return;
+
+    const ics = buildAgendaIcs(selectedSessions);
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'mycellium-ardd-2026-agenda.ics';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
   };
 
   return (
@@ -125,13 +220,20 @@ export default function SchedulePage() {
             <aside className="h-max rounded-lg border border-zinc-200 bg-[#f8fbfa] p-5">
               <h2 className="text-base font-semibold text-black">My Agenda</h2>
               <div className="mt-4 space-y-3">
-                {selected.length ? (
-                  selected.map((title) => <p key={title} className="rounded border border-zinc-200 bg-white p-3 text-sm text-zinc-700">{title}</p>)
+                {selectedSessions.length ? (
+                  selectedSessions.map((session) => (
+                    <p key={session.title} className="rounded border border-zinc-200 bg-white p-3 text-sm text-zinc-700">
+                      <span className="block font-semibold text-black">{session.title}</span>
+                      <span className="mt-1 block text-xs text-zinc-500">
+                        {session.day} · {session.time} · {session.room}
+                      </span>
+                    </p>
+                  ))
                 ) : (
                   <p className="text-sm leading-6 text-zinc-500">Select sessions to assemble your agenda.</p>
                 )}
               </div>
-              <MyButton className="mt-5 w-full" disabled={!selected.length}>
+              <MyButton className="mt-5 w-full" disabled={!selectedSessions.length} onClick={exportAgenda}>
                 Export Agenda
               </MyButton>
             </aside>
