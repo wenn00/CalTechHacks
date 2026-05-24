@@ -11,6 +11,9 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed-messages": "tsx prisma/seed-messages.ts",
+    "db:seed-videos": "tsx prisma/seed-videos.ts",
+    "db:seed-matches": "tsx prisma/seed-matches.ts",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset"
   },
@@ -24,6 +27,7 @@
     "helmet": "^8.0.0",
     "jose": "^6.2.3",
     "jsonwebtoken": "^9.0.2",
+    "socket.io": "^4.8.3",
     "zod": "^3.23.8"
   },
   "devDependencies": {
