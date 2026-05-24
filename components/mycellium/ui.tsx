@@ -1,7 +1,9 @@
 'use client';
 
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 const navIconClass = 'h-5 w-5';
 type SidebarSection = 'directory' | 'matches' | 'schedule' | 'messages' | 'map';
@@ -35,9 +37,27 @@ type AppSidebarProps = {
   activeSection?: SidebarSection;
 };
 
+type SidebarProfile = {
+  name: string | null;
+  email: string | null;
+  institution: string | null;
+  role: string | null;
+  career_stage: string | null;
+};
+
 export function AppSidebar({ view = 'directory', onViewChange, activeSection }: AppSidebarProps) {
   const router = useRouter();
   const active = activeSection ?? view;
+  const accountRef = useRef<HTMLDivElement | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [profile, setProfile] = useState<SidebarProfile>({
+    name: null,
+    email: null,
+    institution: null,
+    role: null,
+    career_stage: null,
+  });
 
   const openNetworkView = (nextView: 'directory' | 'matches') => {
     if (onViewChange) {
@@ -47,34 +67,167 @@ export function AppSidebar({ view = 'directory', onViewChange, activeSection }: 
     router.push(nextView === 'matches' ? '/directory?view=matches' : '/directory');
   };
 
+  useEffect(() => {
+    setCollapsed(window.localStorage.getItem('mycellium-sidebar-collapsed') === 'true');
+  }, []);
+
+  useEffect(() => {
+    async function loadProfile() {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const user = sessionData.session?.user;
+      if (!user) {
+        setProfile({ name: null, email: null, institution: null, role: null, career_stage: null });
+        return;
+      }
+
+      const fallbackName =
+        (user.user_metadata?.full_name as string | undefined) ??
+        (user.user_metadata?.name as string | undefined) ??
+        user.email?.split('@')[0] ??
+        null;
+
+      const { data } = await supabase
+        .from('profiles')
+        .select('name, email, institution, role, career_stage')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      setProfile({
+        name: (data?.name as string | null | undefined) ?? fallbackName,
+        email: (data?.email as string | null | undefined) ?? user.email ?? null,
+        institution: (data?.institution as string | null | undefined) ?? null,
+        role: (data?.role as string | null | undefined) ?? null,
+        career_stage: (data?.career_stage as string | null | undefined) ?? null,
+      });
+    }
+
+    loadProfile();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
+      loadProfile();
+    });
+
+    return () => authListener.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    function closeAccount(event: MouseEvent) {
+      if (accountRef.current && !accountRef.current.contains(event.target as Node)) {
+        setAccountOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', closeAccount);
+    return () => document.removeEventListener('mousedown', closeAccount);
+  }, []);
+
+  const displayName = profile.name ?? 'Mycellium attendee';
+  const initials = useMemo(() => getInitials(displayName), [displayName]);
+
+  const toggleCollapsed = () => {
+    setCollapsed((current) => {
+      const next = !current;
+      window.localStorage.setItem('mycellium-sidebar-collapsed', String(next));
+      return next;
+    });
+    setAccountOpen(false);
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setAccountOpen(false);
+    router.push('/login');
+  };
+
   return (
-    <aside className="flex border-zinc-200 bg-white md:sticky md:top-0 md:h-screen md:min-h-screen md:w-[92px] md:border-r lg:w-[260px]">
-      <div className="flex w-full items-center justify-between gap-4 overflow-x-auto px-4 py-3 md:h-full md:flex-col md:items-stretch md:overflow-hidden md:p-8">
+    <aside
+      className={`relative flex border-zinc-200 bg-white transition-[width] md:sticky md:top-0 md:h-screen md:min-h-screen md:w-[92px] md:border-r ${
+        collapsed ? 'lg:w-[92px]' : 'lg:w-[260px]'
+      }`}
+    >
+      <div
+        className={`flex w-full items-center justify-between gap-4 overflow-x-auto px-4 py-3 md:h-full md:flex-col md:items-stretch md:overflow-visible ${
+          collapsed ? 'md:p-5' : 'md:p-8'
+        }`}
+      >
         <div className="flex items-center gap-3 md:flex-col md:items-stretch md:gap-10">
-          <img src="/mycellium/logo.png" alt="Mycellium" className="h-10 w-10 object-contain object-left lg:h-20 lg:w-48" />
+          <img
+            src="/mycellium/logo.png"
+            alt="Mycellium"
+            className={`h-10 object-contain object-left transition-[width,height] ${
+              collapsed ? 'w-10 lg:h-10' : 'w-10 lg:h-20 lg:w-48'
+            }`}
+          />
           <nav className="flex items-center gap-2 md:flex-col md:items-stretch md:gap-4">
             <SidebarButton
               active={active === 'directory'}
+              collapsed={collapsed}
               icon={<HomeIcon />}
               label="Directory"
               onClick={() => openNetworkView('directory')}
             />
             <SidebarButton
               active={active === 'matches'}
+              collapsed={collapsed}
               icon={<CompareIcon />}
               label="Matches"
               onClick={() => openNetworkView('matches')}
             />
-            <SidebarButton active={active === 'schedule'} icon={<CalendarIcon />} label="Schedule" onClick={() => router.push('/schedule')} />
-            <SidebarButton active={active === 'messages'} icon={<MessagesIcon />} label="Messages" onClick={() => router.push('/messages')} />
-            <SidebarButton active={active === 'map'} icon={<MapIcon />} label="Map" onClick={() => router.push('/map')} />
+            <SidebarButton
+              active={active === 'schedule'}
+              collapsed={collapsed}
+              icon={<CalendarIcon />}
+              label="Schedule"
+              onClick={() => router.push('/schedule')}
+            />
+            <SidebarButton
+              active={active === 'messages'}
+              collapsed={collapsed}
+              icon={<MessagesIcon />}
+              label="Messages"
+              onClick={() => router.push('/messages')}
+            />
+            <SidebarButton
+              active={active === 'map'}
+              collapsed={collapsed}
+              icon={<MapIcon />}
+              label="Map"
+              onClick={() => router.push('/map')}
+            />
           </nav>
         </div>
-        <div className="hidden items-center justify-between lg:flex">
-          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#deefec] text-sm font-semibold text-[#195c52]">
-            MC
-          </div>
-          <PanelIcon />
+        <div ref={accountRef} className={`relative hidden items-center lg:flex ${collapsed ? 'flex-col gap-3' : 'justify-between'}`}>
+          {accountOpen && (
+            <AccountPopover
+              collapsed={collapsed}
+              displayName={displayName}
+              initials={initials}
+              profile={profile}
+              onOpenProfile={() => {
+                setAccountOpen(false);
+                router.push('/onboarding');
+              }}
+              onSignOut={signOut}
+            />
+          )}
+
+          <button
+            type="button"
+            aria-label="Open account"
+            onClick={() => setAccountOpen((open) => !open)}
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-[#deefec] text-sm font-semibold text-[#195c52] transition hover:bg-[#cfe7e3]"
+          >
+            {initials}
+          </button>
+          <button
+            type="button"
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            onClick={toggleCollapsed}
+            className="flex h-10 w-10 items-center justify-center rounded-lg text-[#0b2e28] transition hover:bg-[#eef7f5]"
+          >
+            <PanelIcon collapsed={collapsed} />
+          </button>
         </div>
       </div>
     </aside>
@@ -83,24 +236,96 @@ export function AppSidebar({ view = 'directory', onViewChange, activeSection }: 
 
 type SidebarButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   active?: boolean;
+  collapsed?: boolean;
   icon: ReactNode;
   label: string;
 };
 
-function SidebarButton({ active = false, icon, label, className = '', ...props }: SidebarButtonProps) {
+function SidebarButton({ active = false, collapsed = false, icon, label, className = '', ...props }: SidebarButtonProps) {
   return (
     <button
       type="button"
       title={label}
       aria-label={label}
-      className={`flex h-12 min-w-12 items-center justify-center gap-3 rounded-lg px-3 text-[#0b2e28] transition hover:bg-[#eef7f5] disabled:cursor-not-allowed disabled:opacity-45 lg:justify-start lg:px-5 ${
+      className={`flex h-12 min-w-12 items-center justify-center gap-3 rounded-lg px-3 text-[#0b2e28] transition hover:bg-[#eef7f5] disabled:cursor-not-allowed disabled:opacity-45 ${
+        collapsed ? 'lg:justify-center lg:px-3' : 'lg:justify-start lg:px-5'
+      } ${
         active ? 'bg-[#ddf2ef] font-bold text-[#4a9b8e]' : 'font-semibold'
       } ${className}`}
       {...props}
     >
       {icon}
-      <span className="hidden whitespace-nowrap lg:inline">{label}</span>
+      <span className={collapsed ? 'hidden' : 'hidden whitespace-nowrap lg:inline'}>{label}</span>
     </button>
+  );
+}
+
+function AccountPopover({
+  collapsed,
+  displayName,
+  initials,
+  profile,
+  onOpenProfile,
+  onSignOut,
+}: {
+  collapsed: boolean;
+  displayName: string;
+  initials: string;
+  profile: SidebarProfile;
+  onOpenProfile: () => void;
+  onSignOut: () => void;
+}) {
+  const signedIn = Boolean(profile.email);
+
+  return (
+    <div
+      className={`absolute bottom-14 z-50 w-[286px] rounded-lg border border-zinc-200 bg-white p-4 text-left shadow-xl ${
+        collapsed ? 'left-12' : 'left-0'
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#deefec] text-sm font-bold text-[#195c52]">
+          {initials}
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-base font-semibold text-black">{displayName}</p>
+          <p className="truncate text-sm text-zinc-500">{profile.email ?? 'Not signed in'}</p>
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-3 text-sm">
+        <AccountLine label="Institution" value={profile.institution ?? 'Not set'} />
+        <AccountLine label="Role" value={profile.role ?? 'Not set'} />
+        <AccountLine label="Career Stage" value={formatAccountStage(profile.career_stage)} />
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={onOpenProfile}
+          className="rounded bg-[#0b2e28] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#08241f]"
+        >
+          Profile
+        </button>
+        <button
+          type="button"
+          onClick={onSignOut}
+          disabled={!signedIn}
+          className="rounded border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:text-zinc-300"
+        >
+          Sign Out
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AccountLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="font-medium text-black">{label}</p>
+      <p className="mt-0.5 text-zinc-500">{value}</p>
+    </div>
   );
 }
 
@@ -258,11 +483,21 @@ function MapIcon() {
   );
 }
 
-function PanelIcon() {
+function PanelIcon({ collapsed = false }: { collapsed?: boolean }) {
   return (
     <svg className="h-5 w-5 text-[#0b2e28]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="M9 4v16M15 9l-3 3 3 3" />
+      <path d={collapsed ? 'M9 4v16M12 9l3 3-3 3' : 'M9 4v16M15 9l-3 3 3 3'} />
     </svg>
   );
+}
+
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? 'M') + (parts[1]?.[0] ?? '')).toUpperCase();
+}
+
+function formatAccountStage(stage: string | null) {
+  if (!stage) return 'Not set';
+  return stage.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }
