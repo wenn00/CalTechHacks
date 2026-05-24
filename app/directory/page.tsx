@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { AppSidebar, Field, MyButton, SelectField, Tag } from '@/components/mycellium/ui';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -24,248 +26,747 @@ interface Attendee {
   company_name: string | null;
 }
 
+interface MatchProfile {
+  id: string;
+  name: string;
+  photo_url: string | null;
+  institution: string | null;
+  career_stage: string | null;
+  bio: string | null;
+  linkedin_url: string | null;
+  google_scholar_url: string | null;
+  research_area: string | null;
+  research_keywords: string[];
+}
+
+interface MatchRow {
+  id: string;
+  score: number;
+  shared_keywords: string[];
+  shared_areas: string[];
+  explanation: string;
+  profile: MatchProfile | null;
+}
+
 interface FilterOptions {
   researchAreas: string[];
   institutions: string[];
   careerStages: string[];
   roles: string[];
+  keywords?: string[];
 }
 
 interface Meta {
   page: number;
   limit: number;
   total: number;
-  totalPages: number;
+  totalPages?: number;
 }
+
+type NetworkPerson = {
+  id: string;
+  name: string;
+  email?: string;
+  photo_url: string | null;
+  institution: string | null;
+  role: string | null;
+  career_stage: string | null;
+  bio: string | null;
+  linkedin_url: string | null;
+  google_scholar_url: string | null;
+  research_area: string | null;
+  research_keywords: string[];
+  abstract_summary?: string | null;
+  goals: string[];
+  company_name?: string | null;
+  score?: number;
+  explanation?: string;
+  sharedInterests: string[];
+};
+
+const NODE_POSITIONS = [
+  { x: 52, y: 46, size: 88 },
+  { x: 23, y: 51, size: 54 },
+  { x: 27, y: 71, size: 54 },
+  { x: 39, y: 88, size: 54 },
+  { x: 72, y: 19, size: 54 },
+  { x: 50, y: 31, size: 54 },
+  { x: 72, y: 79, size: 54 },
+  { x: 88, y: 62, size: 54 },
+  { x: 14, y: 30, size: 54 },
+  { x: 52, y: 63, size: 54 },
+  { x: 77, y: 33, size: 54 },
+  { x: 36, y: 22, size: 54 },
+];
+
+const EDGES = [
+  [0, 1],
+  [0, 2],
+  [0, 5],
+  [0, 7],
+  [0, 9],
+  [1, 8],
+  [2, 3],
+  [3, 6],
+  [4, 5],
+  [4, 10],
+  [5, 10],
+  [6, 7],
+  [8, 11],
+];
+
+const DEMO_PEOPLE: NetworkPerson[] = [
+  {
+    id: 'demo-sc',
+    name: 'Sarah Chen',
+    email: 'sarah@example.com',
+    photo_url: null,
+    institution: 'Caltech',
+    role: 'Senior Scientist',
+    career_stage: 'senior_researcher',
+    bio: 'Works on regenerative medicine and aging biology.',
+    linkedin_url: null,
+    google_scholar_url: null,
+    research_area: 'Regenerative Medicine',
+    research_keywords: ['regenerative medicine', 'senolytics', 'stem cells'],
+    abstract_summary: null,
+    goals: ['Knowledge', 'Collaboration'],
+    score: 0.89,
+    explanation: 'Same institution with adjacent research in regenerative medicine. Possible synergies with aging research.',
+    sharedInterests: ['Caltech', 'Partnership'],
+  },
+  ...['Oscar Peterson', 'Camila Diaz', 'Eli Fisher', 'Iris Jiang', 'Quinn Rivera', 'Mina Novak', 'Kai Li', 'Ava Brooks'].map((name, index) => ({
+    id: `demo-${index}`,
+    name,
+    email: undefined,
+    photo_url: null,
+    institution: index % 2 === 0 ? 'Caltech' : 'UCI',
+    role: index % 3 === 0 ? 'Academic Researcher' : 'Biotech Founder',
+    career_stage: index % 2 === 0 ? 'early_career_researcher' : 'mid_career_researcher',
+    bio: 'Demo profile shown while the attendee API is unavailable.',
+    linkedin_url: null,
+    google_scholar_url: null,
+    research_area: ['Senolytics', 'Biomarkers', 'Gene Therapy'][index % 3] ?? 'Senolytics',
+    research_keywords: ['senolytics', 'biomarkers', 'collaboration'],
+    abstract_summary: null,
+    goals: ['Knowledge', 'Collaboration'],
+    score: Math.max(0.62, 0.84 - index * 0.03),
+    explanation: 'Shared research keywords and overlapping conference goals make this a promising introduction.',
+    sharedInterests: ['Knowledge', 'Collaboration'],
+  })),
+];
 
 export default function DirectoryPage() {
   const router = useRouter();
-  const [attendees, setAttendees]     = useState<Attendee[]>([]);
-  const [filters, setFilters]         = useState<FilterOptions>({ researchAreas: [], institutions: [], careerStages: [], roles: [] });
-  const [meta, setMeta]               = useState<Meta>({ page: 1, limit: 12, total: 0, totalPages: 1 });
-  const [selected, setSelected]       = useState<Attendee | null>(null);
-  const [loading, setLoading]         = useState(true);
-  const [meId, setMeId]               = useState<string | null>(null);
-  const [opening, setOpening]         = useState(false);
+  const [view, setView] = useState<'directory' | 'matches'>('directory');
+  const [showFilters, setShowFilters] = useState(true);
+  const [attendees, setAttendees] = useState<Attendee[]>([]);
+  const [matches, setMatches] = useState<MatchRow[]>([]);
+  const [filters, setFilters] = useState<FilterOptions>({ researchAreas: [], institutions: [], careerStages: [], roles: [] });
+  const [meta, setMeta] = useState<Meta>({ page: 1, limit: 12, total: 0, totalPages: 1 });
+  const [selected, setSelected] = useState<NetworkPerson | null>(null);
+  const [drawerMode, setDrawerMode] = useState<'match' | 'profile'>('match');
+  const [loading, setLoading] = useState(true);
+  const [matchesLoading, setMatchesLoading] = useState(true);
+  const [matchStatus, setMatchStatus] = useState<'idle' | 'connected' | 'error'>('idle');
+  const [attendeeApiFailed, setAttendeeApiFailed] = useState(false);
+
+  const [q, setQ] = useState('');
+  const [researchArea, setResearchArea] = useState('');
+  const [careerStage, setCareerStage] = useState('');
+  const [institution, setInstitution] = useState('');
+  const [role, setRole] = useState('');
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setMeId(data.session?.user?.id ?? null));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
-      setMeId(session?.user?.id ?? null);
-    });
-    return () => subscription.unsubscribe();
+    fetch(`${API}/api/attendees/filters`)
+      .then((response) => response.json())
+      .then(({ data }) => setFilters(data ?? { researchAreas: [], institutions: [], careerStages: [], roles: [] }))
+      .catch(() => setFilters({ researchAreas: [], institutions: [], careerStages: [], roles: [] }));
   }, []);
 
-  async function openChatWith(participantId: string) {
-    const { data: sess } = await supabase.auth.getSession();
-    const token = sess.session?.access_token;
-    if (!token) { router.push('/login'); return; }
-    setOpening(true);
+  const fetchAttendees = useCallback(async (targetPage = page) => {
+    setLoading(true);
+    const params = new URLSearchParams({ page: String(targetPage), limit: '12' });
+    if (q.trim()) params.set('q', q.trim());
+    if (researchArea) params.set('research_area', researchArea);
+    if (careerStage) params.set('career_stage', careerStage);
+    if (institution) params.set('institution', institution);
+    if (role) params.set('role', role);
+
     try {
-      const res = await fetch(`${API}/api/messages/conversations`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ participantId }),
+      const response = await fetch(`${API}/api/attendees?${params}`);
+      if (!response.ok) throw new Error('Attendee request failed');
+      const json = await response.json();
+      setAttendees(Array.isArray(json.data) ? json.data : []);
+      setAttendeeApiFailed(false);
+      setMeta({
+        page: json.meta?.page ?? targetPage,
+        limit: json.meta?.limit ?? 12,
+        total: json.meta?.total ?? 0,
+        totalPages: json.meta?.totalPages ?? Math.max(1, Math.ceil((json.meta?.total ?? 0) / (json.meta?.limit ?? 12))),
       });
-      const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.data?.id) {
+    } catch {
+      setAttendees([]);
+      setAttendeeApiFailed(true);
+      setMeta({ page: targetPage, limit: 12, total: 0, totalPages: 1 });
+    } finally {
+      setLoading(false);
+    }
+  }, [careerStage, institution, page, q, researchArea, role]);
+
+  const fetchMatches = useCallback(async () => {
+    setMatchesLoading(true);
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) {
+      setMatches([]);
+      setMatchesLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API}/api/matches?limit=20`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await response.json();
+      setMatches(response.ok && Array.isArray(json.data) ? json.data : []);
+    } catch {
+      setMatches([]);
+    } finally {
+      setMatchesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAttendees(page);
+  }, [fetchAttendees, page]);
+
+  useEffect(() => {
+    fetchMatches();
+  }, [fetchMatches]);
+
+  const directoryPeople = useMemo(() => attendees.map(attendeeToPerson), [attendees]);
+  const matchPeople = useMemo(() => matches.map(matchToPerson).filter((person): person is NetworkPerson => Boolean(person)), [matches]);
+  const fallbackPeople = attendeeApiFailed && !loading ? DEMO_PEOPLE : [];
+  const people = view === 'matches' && matchPeople.length > 0 ? matchPeople : directoryPeople.length > 0 ? directoryPeople : fallbackPeople;
+  const isGraphLoading = view === 'matches' ? matchesLoading && !matchPeople.length : loading;
+
+  const search = () => {
+    setPage(1);
+    fetchAttendees(1);
+  };
+
+  const clearFilters = () => {
+    setQ('');
+    setResearchArea('');
+    setCareerStage('');
+    setInstitution('');
+    setRole('');
+    setPage(1);
+  };
+
+  const openPerson = (person: NetworkPerson) => {
+    setSelected(person);
+    setDrawerMode(typeof person.score === 'number' ? 'match' : 'profile');
+    setMatchStatus('idle');
+  };
+
+  const openChat = async () => {
+    if (!selected) return;
+    // Demo people have non-UUID ids ("demo-sc", "demo-0", …) and aren't in
+    // the messaging DB — bail early with a friendly message instead of a
+    // 400 from the server.
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selected.id);
+    if (!isUuid) {
+      alert('This is a demo profile — sign in and pick a real attendee to start a chat.');
+      return;
+    }
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
+    setMatchStatus('idle');
+    try {
+      const response = await fetch(`${API}/api/messages/conversations`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ participantId: selected.id }),
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok || !json?.data?.id) {
+        setMatchStatus('error');
         alert(json?.error || 'Could not start conversation');
         return;
       }
       router.push(`/messages?c=${json.data.id}`);
-    } finally {
-      setOpening(false);
+    } catch {
+      setMatchStatus('error');
     }
+  };
+
+  return (
+    <main className="min-h-screen bg-white text-black">
+      <div className="md:flex">
+        <AppSidebar view={view} onViewChange={setView} />
+
+        <section className="min-h-screen flex-1 px-5 py-6 lg:px-8">
+          <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-3xl font-semibold leading-tight">Research Network</h1>
+              <p className="mt-2 text-sm text-zinc-500">
+                {view === 'matches' && matchPeople.length > 0
+                  ? 'Ranked matches from your profile signals'
+                  : 'Browse attendees by research area, institution, and goals'}
+              </p>
+            </div>
+
+            <label className="flex items-center gap-3 self-start text-lg font-medium text-zinc-400 sm:self-auto">
+              <span>Show Filters</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={showFilters}
+                onClick={() => setShowFilters((value) => !value)}
+                className={`relative h-[31px] w-[51px] rounded-full transition ${showFilters ? 'bg-[#4a9b8e]' : 'bg-zinc-200'}`}
+              >
+                <span
+                  className={`absolute top-0.5 h-[27px] w-[27px] rounded-full bg-white shadow transition ${
+                    showFilters ? 'left-[22px]' : 'left-0.5'
+                  }`}
+                />
+              </button>
+            </label>
+          </header>
+
+          <div className={`mt-6 grid grid-cols-1 gap-6 ${showFilters ? 'xl:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]' : ''}`}>
+            {showFilters && (
+              <FilterPanel
+                view={view}
+                setView={setView}
+                q={q}
+                setQ={setQ}
+                researchArea={researchArea}
+                setResearchArea={setResearchArea}
+                careerStage={careerStage}
+                setCareerStage={setCareerStage}
+                institution={institution}
+                setInstitution={setInstitution}
+                role={role}
+                setRole={setRole}
+                filters={filters}
+                onSearch={search}
+                onClear={clearFilters}
+                count={view === 'matches' && matchPeople.length > 0 ? matchPeople.length : directoryPeople.length || fallbackPeople.length || meta.total}
+              />
+            )}
+
+            <section className="relative min-h-[560px] overflow-hidden bg-white">
+              <NetworkGraph people={people} loading={isGraphLoading} selectedId={selected?.id} onSelect={openPerson} />
+
+              {view === 'directory' && (meta.totalPages ?? 1) > 1 && (
+                <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 rounded-full border border-zinc-200 bg-white/90 px-4 py-2 shadow-sm backdrop-blur">
+                  <button
+                    type="button"
+                    onClick={() => setPage((current) => Math.max(1, current - 1))}
+                    disabled={page <= 1}
+                    className="text-sm font-medium text-[#0b2e28] disabled:text-zinc-300"
+                  >
+                    Prev
+                  </button>
+                  <span className="text-xs text-zinc-500">
+                    Page {meta.page} of {meta.totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPage((current) => Math.min(meta.totalPages ?? 1, current + 1))}
+                    disabled={page >= (meta.totalPages ?? 1)}
+                    className="text-sm font-medium text-[#0b2e28] disabled:text-zinc-300"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </section>
+          </div>
+        </section>
+      </div>
+
+      {selected && (
+        <ProfileDrawer
+          person={selected}
+          mode={drawerMode}
+          setMode={setDrawerMode}
+          onClose={() => setSelected(null)}
+          onMessage={openChat}
+          matchStatus={matchStatus}
+        />
+      )}
+    </main>
+  );
+}
+
+function FilterPanel(props: {
+  view: 'directory' | 'matches';
+  setView: (view: 'directory' | 'matches') => void;
+  q: string;
+  setQ: (value: string) => void;
+  researchArea: string;
+  setResearchArea: (value: string) => void;
+  careerStage: string;
+  setCareerStage: (value: string) => void;
+  institution: string;
+  setInstitution: (value: string) => void;
+  role: string;
+  setRole: (value: string) => void;
+  filters: FilterOptions;
+  onSearch: () => void;
+  onClear: () => void;
+  count: number;
+}) {
+  return (
+    <aside className="border-zinc-100 bg-white xl:min-h-[calc(100vh-120px)]">
+      <div className="space-y-7">
+        <div>
+          <div className="mb-4 inline-flex border-b border-zinc-200">
+            {(['directory', 'matches'] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => props.setView(item)}
+                className={`h-11 px-4 text-sm capitalize ${
+                  props.view === item ? 'border-b border-zinc-900 text-black' : 'text-zinc-500 hover:text-black'
+                }`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+          <Field
+            value={props.q}
+            onChange={(event) => props.setQ(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') props.onSearch();
+            }}
+            placeholder="Search by name, keyword, bio..."
+          />
+        </div>
+
+        <div className="space-y-5">
+          <SelectField label="Research Area" value={props.researchArea} onChange={(event) => props.setResearchArea(event.target.value)}>
+            <option value="">All research areas</option>
+            {props.filters.researchAreas.map((area) => (
+              <option key={area} value={area}>
+                {area}
+              </option>
+            ))}
+          </SelectField>
+
+          <SelectField label="Career Stage" value={props.careerStage} onChange={(event) => props.setCareerStage(event.target.value)}>
+            <option value="">All career stages</option>
+            {props.filters.careerStages.map((stage) => (
+              <option key={stage} value={stage}>
+                {formatStage(stage)}
+              </option>
+            ))}
+          </SelectField>
+
+          <SelectField label="Institution" value={props.institution} onChange={(event) => props.setInstitution(event.target.value)}>
+            <option value="">All institutions</option>
+            {props.filters.institutions.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </SelectField>
+
+          <SelectField label="Role" value={props.role} onChange={(event) => props.setRole(event.target.value)}>
+            <option value="">All roles</option>
+            {props.filters.roles.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </SelectField>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <MyButton onClick={props.onSearch}>Search</MyButton>
+          <MyButton variant="secondary" onClick={props.onClear}>
+            Clear
+          </MyButton>
+        </div>
+
+        <p className="text-sm text-zinc-500">{props.count} people found</p>
+      </div>
+    </aside>
+  );
+}
+
+function NetworkGraph({
+  people,
+  loading,
+  selectedId,
+  onSelect,
+}: {
+  people: NetworkPerson[];
+  loading: boolean;
+  selectedId?: string;
+  onSelect: (person: NetworkPerson) => void;
+}) {
+  const nodes = people.slice(0, NODE_POSITIONS.length);
+
+  if (loading) {
+    return <div className="flex h-[560px] items-center justify-center text-sm text-zinc-500">Loading network...</div>;
   }
 
-  const [q, setQ]                     = useState('');
-  const [researchArea, setResearchArea] = useState('');
-  const [careerStage, setCareerStage] = useState('');
-  const [institution, setInstitution] = useState('');
-  const [page, setPage]               = useState(1);
-
-  // Load filter options once
-  useEffect(() => {
-    fetch(`${API}/api/attendees/filters`)
-      .then(r => r.json())
-      .then(({ data }) => setFilters(data))
-      .catch(console.error);
-  }, []);
-
-  const fetchAttendees = useCallback(async (p = page) => {
-    setLoading(true);
-    const params = new URLSearchParams({ page: String(p), limit: '12' });
-    if (q)            params.set('q', q);
-    if (researchArea) params.set('research_area', researchArea);
-    if (careerStage)  params.set('career_stage', careerStage);
-    if (institution)  params.set('institution', institution);
-
-    try {
-      const res  = await fetch(`${API}/api/attendees?${params}`);
-      const json = await res.json();
-      setAttendees(json.data || []);
-      setMeta(json.meta);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [q, researchArea, careerStage, institution, page]);
-
-  useEffect(() => { fetchAttendees(page); }, [page]);
-
-  function search() { setPage(1); fetchAttendees(1); }
-  function clear()  { setQ(''); setResearchArea(''); setCareerStage(''); setInstitution(''); setPage(1); }
-
-  function initials(name: string) {
-    return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
-  }
-
-  function fmtStage(s: string | null) {
-    return (s || '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  if (!nodes.length) {
+    return (
+      <div className="flex h-[560px] items-center justify-center text-center">
+        <div>
+          <p className="text-lg font-semibold text-zinc-900">No people found</p>
+          <p className="mt-1 text-sm text-zinc-500">Try a different search term or clear filters.</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <h1 className="text-2xl font-bold text-gray-900">Attendee Directory</h1>
-        <p className="text-sm text-gray-500 mt-1">ARDD 2026 Conference</p>
-      </div>
+    <div className="relative mx-auto h-[560px] max-w-[760px] md:h-[calc(100vh-120px)] md:min-h-[640px]">
+      <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        {EDGES.filter(([a, b]) => a < nodes.length && b < nodes.length).map(([a, b]) => {
+          const from = NODE_POSITIONS[a]!;
+          const to = NODE_POSITIONS[b]!;
+          return <line key={`${a}-${b}`} x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke="#b8cac7" strokeWidth="0.45" />;
+        })}
+      </svg>
 
-      {/* Search & Filters */}
-      <div className="bg-white border-b border-gray-200 px-6 py-3 flex flex-wrap gap-3 items-center">
-        <input
-          type="text"
-          value={q}
-          onChange={e => setQ(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && search()}
-          placeholder="Search by name, keywords, bio..."
-          className="flex-1 min-w-[200px] px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <select value={researchArea} onChange={e => setResearchArea(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="">All Research Areas</option>
-          {filters.researchAreas.map(a => <option key={a} value={a}>{a}</option>)}
-        </select>
-        <select value={careerStage} onChange={e => setCareerStage(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="">All Career Stages</option>
-          {filters.careerStages.map(s => <option key={s} value={s}>{fmtStage(s)}</option>)}
-        </select>
-        <select value={institution} onChange={e => setInstitution(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="">All Institutions</option>
-          {filters.institutions.map(i => <option key={i} value={i}>{i}</option>)}
-        </select>
-        <button onClick={search}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
-          Search
-        </button>
-        <button onClick={clear}
-          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">
-          Clear
-        </button>
-      </div>
-
-      {/* Count */}
-      <div className="px-6 py-2 text-sm text-gray-500">
-        {loading ? 'Loading...' : `${meta.total} attendees found`}
-      </div>
-
-      {/* Grid */}
-      <div className="px-6 pb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {!loading && attendees.length === 0 && (
-          <div className="col-span-full text-center py-16 text-gray-400">
-            <p className="text-lg font-medium">No attendees found</p>
-            <p className="text-sm mt-1">Try different search terms or clear filters</p>
-          </div>
-        )}
-        {attendees.map(a => (
-          <div key={a.id} onClick={() => setSelected(a)}
-            className="bg-white rounded-xl p-4 border border-gray-200 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all">
-            <div className="flex items-center gap-3 mb-3">
-              {a.photo_url
-                ? <img src={a.photo_url} alt={a.name} className="w-12 h-12 rounded-full object-cover" />
-                : <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-green-500 flex items-center justify-center text-white font-bold text-lg">{initials(a.name)}</div>
-              }
-              <div>
-                <p className="font-semibold text-gray-900 leading-tight">{a.name}</p>
-                <p className="text-xs text-gray-500">{fmtStage(a.career_stage)}{a.role ? ` · ${a.role}` : ''}</p>
-              </div>
-            </div>
-            {a.institution && <p className="text-xs text-blue-600 mb-2 truncate">🏛 {a.institution}</p>}
-            {a.bio && <p className="text-xs text-gray-600 line-clamp-3 mb-3">{a.bio}</p>}
-            <div className="flex flex-wrap gap-1">
-              {a.research_area && <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full">{a.research_area}</span>}
-              {(a.research_keywords || []).slice(0, 3).map(k => (
-                <span key={k} className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">{k}</span>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Pagination */}
-      {meta.totalPages > 1 && (
-        <div className="flex justify-center gap-3 pb-8">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
-            className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm disabled:opacity-40 hover:bg-gray-50">
-            ← Prev
-          </button>
-          <span className="px-4 py-2 text-sm text-gray-600">Page {meta.page} of {meta.totalPages}</span>
-          <button onClick={() => setPage(p => Math.min(meta.totalPages, p + 1))} disabled={page >= meta.totalPages}
-            className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm disabled:opacity-40 hover:bg-gray-50">
-            Next →
-          </button>
-        </div>
-      )}
-
-      {/* Profile modal */}
-      {selected && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setSelected(null)}>
-          <div className="bg-white rounded-2xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-start mb-4">
-              <div className="flex items-center gap-4">
-                {selected.photo_url
-                  ? <img src={selected.photo_url} alt={selected.name} className="w-16 h-16 rounded-full object-cover" />
-                  : <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-green-500 flex items-center justify-center text-white font-bold text-2xl">{initials(selected.name)}</div>
-                }
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">{selected.name}</h2>
-                  <p className="text-sm text-gray-500">{fmtStage(selected.career_stage)}{selected.role ? ` · ${selected.role}` : ''}</p>
-                  {selected.institution && <p className="text-sm text-blue-600">{selected.institution}</p>}
-                </div>
-              </div>
-              <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
-            </div>
-            {selected.bio && <div className="mb-4"><p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Bio</p><p className="text-sm text-gray-700 leading-relaxed">{selected.bio}</p></div>}
-            {selected.research_area && <div className="mb-4"><p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Research Area</p><p className="text-sm text-gray-700">{selected.research_area}</p></div>}
-            {selected.research_keywords?.length > 0 && (
-              <div className="mb-4">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Keywords</p>
-                <div className="flex flex-wrap gap-1">{selected.research_keywords.map(k => <span key={k} className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">{k}</span>)}</div>
-              </div>
+      {nodes.map((person, index) => {
+        const position = NODE_POSITIONS[index]!;
+        const isSelected = selectedId === person.id;
+        const isPrimary = index === 0;
+        return (
+          <button
+            key={`${person.id}-${index}`}
+            type="button"
+            onClick={() => onSelect(person)}
+            className={`absolute z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-center font-semibold shadow-sm transition hover:scale-105 ${
+              isPrimary ? 'bg-[#195c52] text-white' : index % 3 === 0 ? 'bg-[#deefec] text-[#4a9b8e]' : 'bg-[#9fd5cd] text-[#195c52]'
+            } ${isSelected ? 'ring-4 ring-[#4a9b8e]/25' : ''}`}
+            style={{
+              left: `${position.x}%`,
+              top: `${position.y}%`,
+              width: position.size,
+              height: position.size,
+              fontSize: isPrimary ? 28 : 18,
+            }}
+            title={person.name}
+          >
+            {initials(person.name)}
+            {typeof person.score === 'number' && (
+              <span className="absolute -right-3 -top-2 rounded-full bg-[#195c52] px-2 py-1 text-[11px] font-bold text-white">
+                {formatScore(person.score)}
+              </span>
             )}
-            {selected.abstract_summary && <div className="mb-4"><p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Abstract</p><p className="text-sm text-gray-700 leading-relaxed">{selected.abstract_summary}</p></div>}
-            {selected.goals?.length > 0 && <div className="mb-4"><p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Conference Goals</p><p className="text-sm text-gray-700">{selected.goals.join(' · ')}</p></div>}
-            {selected.company_name && <div className="mb-4"><p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Company</p><p className="text-sm text-gray-700">{selected.company_name}</p></div>}
-            <div className="flex gap-2 mt-4 flex-wrap">
-              {meId && selected.id !== meId && (
-                <button
-                  onClick={() => openChatWith(selected.id)}
-                  disabled={opening}
-                  className="text-sm px-3 py-1.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                >
-                  {opening ? 'Opening…' : '💬 Send Message'}
-                </button>
-              )}
-              {selected.linkedin_url && <a href={selected.linkedin_url} target="_blank" rel="noreferrer" className="text-sm px-3 py-1.5 border border-gray-200 rounded-lg text-blue-600 hover:bg-blue-50">LinkedIn</a>}
-              {selected.google_scholar_url && <a href={selected.google_scholar_url} target="_blank" rel="noreferrer" className="text-sm px-3 py-1.5 border border-gray-200 rounded-lg text-blue-600 hover:bg-blue-50">Google Scholar</a>}
-            </div>
-          </div>
-        </div>
-      )}
+          </button>
+        );
+      })}
     </div>
   );
+}
+
+function ProfileDrawer({
+  person,
+  mode,
+  setMode,
+  onClose,
+  onMessage,
+  matchStatus,
+}: {
+  person: NetworkPerson;
+  mode: 'match' | 'profile';
+  setMode: (mode: 'match' | 'profile') => void;
+  onClose: () => void;
+  onMessage: () => void;
+  matchStatus: 'idle' | 'connected' | 'error';
+}) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/20 backdrop-blur-[2px]" onClick={onClose}>
+      <aside
+        className="absolute bottom-0 right-0 top-auto flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-zinc-200 bg-[#fefefe] shadow-2xl sm:right-6 sm:top-16 sm:h-[calc(100vh-96px)] sm:max-h-none sm:w-[445px] sm:rounded-t-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start gap-5 px-6 py-7">
+          {person.photo_url ? (
+            <img src={person.photo_url} alt={person.name} className="h-[77px] w-[81px] rounded-full object-cover" />
+          ) : (
+            <div className="flex h-[77px] w-[81px] items-center justify-center rounded-full bg-[#deefec] text-xl font-semibold text-[#195c52]">
+              {initials(person.name)}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-2xl font-bold leading-tight text-black">{person.name}</h2>
+            <p className="mt-2 text-base leading-7 text-black">
+              {[person.role, person.institution].filter(Boolean).join(' - ') || formatStage(person.career_stage)}
+            </p>
+          </div>
+          <button type="button" aria-label="Close profile" onClick={onClose} className="text-xl text-zinc-400 hover:text-zinc-700">
+            x
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto border-t border-zinc-200 px-6 py-6">
+          {mode === 'match' ? (
+            <div className="space-y-4">
+              <div className="rounded-[15px] bg-[#deefec] px-5 py-3 text-center text-[#195c52]">
+                <p className="text-4xl font-semibold leading-tight">{typeof person.score === 'number' ? formatScore(person.score) : '76%'}</p>
+                <p className="text-base">Match Score</p>
+              </div>
+
+              <DrawerSection title="Why you're matched">
+                  <p className="text-sm leading-6">
+                  {person.explanation || 'Shared research signals and complementary conference goals make this a useful person to meet.'}
+                </p>
+              </DrawerSection>
+
+              <DrawerSection title="Shared Interests">
+                <div className="flex flex-wrap gap-2">
+                  {(person.sharedInterests.length ? person.sharedInterests : person.research_keywords.slice(0, 3)).map((item) => (
+                    <Tag key={item}>{formatKeyword(item)}</Tag>
+                  ))}
+                </div>
+              </DrawerSection>
+
+              <DrawerSection title="Career Stage">
+                <p className="text-base leading-7">{formatStage(person.career_stage)}</p>
+              </DrawerSection>
+
+              <DrawerSection title="Conference Goals">
+                <div className="flex flex-wrap gap-2">
+                  {(person.goals.length ? person.goals : ['Knowledge', 'Collaboration']).slice(0, 4).map((goal) => (
+                    <Tag key={goal}>{goal}</Tag>
+                  ))}
+                </div>
+              </DrawerSection>
+
+              <DrawerSection title="Availability Overlap">
+                <div className="flex flex-wrap gap-2">
+                  <Tag>Day 1</Tag>
+                  <Tag>Day 2</Tag>
+                </div>
+              </DrawerSection>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <DrawerSection title="Research Area">
+                <p className="text-base leading-7">{person.research_area || 'Not specified'}</p>
+              </DrawerSection>
+              {person.bio && (
+                <DrawerSection title="Bio">
+                  <p className="text-base leading-7">{person.bio}</p>
+                </DrawerSection>
+              )}
+              {person.abstract_summary && (
+                <DrawerSection title="Abstract">
+                  <p className="text-base leading-7">{person.abstract_summary}</p>
+                </DrawerSection>
+              )}
+              <DrawerSection title="Keywords">
+                <div className="flex flex-wrap gap-2">
+                  {person.research_keywords.slice(0, 10).map((keyword) => (
+                    <Tag key={keyword}>{formatKeyword(keyword)}</Tag>
+                  ))}
+                </div>
+              </DrawerSection>
+              <DrawerSection title="Links">
+                <div className="flex flex-wrap gap-2">
+                  {person.linkedin_url && (
+                    <a href={person.linkedin_url} target="_blank" rel="noreferrer" className="text-sm font-medium text-[#2563eb] underline">
+                      LinkedIn
+                    </a>
+                  )}
+                  {person.google_scholar_url && (
+                    <a href={person.google_scholar_url} target="_blank" rel="noreferrer" className="text-sm font-medium text-[#2563eb] underline">
+                      Google Scholar
+                    </a>
+                  )}
+                  {!person.linkedin_url && !person.google_scholar_url && <p className="text-sm text-zinc-500">No public links listed.</p>}
+                </div>
+              </DrawerSection>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 border-t border-zinc-100 bg-white px-5 py-4">
+          <MyButton variant="ghost" onClick={() => setMode(mode === 'match' ? 'profile' : 'match')}>
+            {mode === 'match' ? 'Full Profile' : 'Match Summary'}
+          </MyButton>
+          <MyButton onClick={onMessage}>
+            {matchStatus === 'connected' ? 'Connected' : matchStatus === 'error' ? 'Try Again' : 'Message'}
+          </MyButton>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function DrawerSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section>
+      <h3 className="mb-1.5 text-base font-semibold leading-6 text-black">{title}</h3>
+      <div className="text-black">{children}</div>
+    </section>
+  );
+}
+
+function attendeeToPerson(attendee: Attendee): NetworkPerson {
+  return {
+    ...attendee,
+    sharedInterests: attendee.research_keywords ?? [],
+  };
+}
+
+function matchToPerson(match: MatchRow): NetworkPerson | null {
+  if (!match.profile) return null;
+  return {
+    id: match.profile.id,
+    name: match.profile.name,
+    photo_url: match.profile.photo_url,
+    institution: match.profile.institution,
+    role: null,
+    career_stage: match.profile.career_stage,
+    bio: match.profile.bio,
+    linkedin_url: match.profile.linkedin_url,
+    google_scholar_url: match.profile.google_scholar_url,
+    research_area: match.profile.research_area,
+    research_keywords: match.profile.research_keywords ?? [],
+    goals: [],
+    score: match.score,
+    explanation: match.explanation,
+    sharedInterests: [...(match.shared_keywords ?? []), ...(match.shared_areas ?? [])],
+  };
+}
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return (parts[0]?.[0] ?? 'M').toUpperCase() + (parts[1]?.[0] ?? '').toUpperCase();
+}
+
+function formatStage(stage: string | null | undefined) {
+  if (!stage) return 'Not specified';
+  return stage.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatKeyword(keyword: string) {
+  return keyword.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatScore(score: number) {
+  return `${Math.round(score * 100)}%`;
 }
