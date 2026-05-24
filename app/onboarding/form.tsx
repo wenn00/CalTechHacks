@@ -85,6 +85,7 @@ export default function OnboardingForm() {
   const isRoleValid = Boolean(formData.role && formData.careerStage);
   const isInterestsValid = formData.selectedAreas.length > 0;
   const canContinue = step === 0 ? isProfileValid : step === 1 ? isRoleValid : step === 2 ? isInterestsValid : true;
+  const maxReachableStep: Step = !isProfileValid ? 0 : !isRoleValid ? 1 : !isInterestsValid ? 2 : 3;
 
   const fullName = useMemo(
     () => [formData.firstName.trim(), formData.lastName.trim()].filter(Boolean).join(' '),
@@ -180,7 +181,6 @@ export default function OnboardingForm() {
     );
 
     if (isMock) {
-      alert('Dev Mode: Profile would be saved here. Redirecting to the network.');
       window.location.href = '/directory';
       return;
     }
@@ -242,9 +242,14 @@ export default function OnboardingForm() {
                 <button
                   key={tab}
                   type="button"
+                  disabled={index > maxReachableStep}
                   onClick={() => setStep(index as Step)}
                   className={`h-11 px-4 text-sm ${
-                    step === index ? 'border-b border-zinc-900 text-black' : 'text-zinc-500 hover:text-black'
+                    step === index
+                      ? 'border-b border-zinc-900 text-black'
+                      : index > maxReachableStep
+                        ? 'cursor-not-allowed text-zinc-300'
+                        : 'text-zinc-500 hover:text-black'
                   }`}
                 >
                   {tab}
@@ -252,137 +257,151 @@ export default function OnboardingForm() {
               ))}
             </div>
 
-            <div className="mt-4 border border-zinc-200 bg-white p-6 md:p-8">
-              {step === 0 && (
-                <div className="space-y-9">
-                  <div className="grid gap-8 md:grid-cols-2">
-                    <Field
-                      label="First Name"
-                      requiredMark
-                      value={formData.firstName}
-                      onChange={(event) => update({ firstName: event.target.value })}
-                      placeholder="Enter first name"
-                    />
-                    <Field
-                      label="Last Name"
-                      requiredMark
-                      value={formData.lastName}
-                      onChange={(event) => update({ lastName: event.target.value })}
-                      placeholder="Enter last name"
-                    />
-                  </div>
-                  <Field
-                    label="Email"
-                    requiredMark
-                    type="email"
-                    value={formData.email}
-                    onChange={(event) => update({ email: event.target.value })}
-                    placeholder="Enter email"
-                  />
-                  <Field
-                    label="Institution/Organization Affiliation"
-                    requiredMark
-                    value={formData.institution}
-                    onChange={(event) => update({ institution: event.target.value })}
-                    placeholder="Enter institution or organization"
-                  />
-                </div>
-              )}
+            <div className="mt-5 max-w-[760px]">
+              <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.12em] text-zinc-400">
+                <span>Step {step + 1} of {TABS.length}</span>
+                <span>{TABS[step]}</span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-100">
+                <div className="h-full bg-[#4a9b8e] transition-all" style={{ width: `${((step + 1) / TABS.length) * 100}%` }} />
+              </div>
+            </div>
 
-              {step === 1 && (
-                <div className="space-y-8">
-                  <div>
-                    <h2 className="text-lg font-medium text-black">Tell us about yourself</h2>
-                    <p className="mt-2 text-base text-black">This helps us find your best matches</p>
-                  </div>
-                  <div>
-                    <h3 className="mb-3 text-lg font-medium text-black">Your Role</h3>
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                      {ROLE_OPTIONS.map((role) => (
-                        <ChoiceCard key={role} label={role} selected={formData.role === role} onClick={() => update({ role })} />
-                      ))}
-                    </div>
-                  </div>
-                  <SelectField
-                    label="Career Stage"
-                    value={formData.careerStage}
-                    onChange={(event) => update({ careerStage: event.target.value })}
-                  >
-                    {CAREER_STAGES.map((stage) => (
-                      <option key={stage.value} value={stage.value}>
-                        {stage.label}
-                      </option>
-                    ))}
-                  </SelectField>
-                </div>
-              )}
-
-              {step === 2 && (
-                <div className="space-y-8">
-                  <div>
-                    <h2 className="text-lg font-medium text-black">Research Interests</h2>
-                    <p className="mt-2 text-base text-black">Select areas and add specific keywords</p>
-                  </div>
-                  <div>
-                    <h3 className="mb-3 text-xl font-medium text-black">Research Areas</h3>
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                      {RESEARCH_AREAS.map((area) => (
-                        <ChoiceCard key={area} label={area} selected={formData.selectedAreas.includes(area)} onClick={() => toggleArea(area)} />
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="mb-3 text-lg font-medium text-black">Additional Keywords</h3>
-                    <div className="grid gap-4 md:grid-cols-[1fr_208px]">
+            <div className="mt-4 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="border border-zinc-200 bg-white p-6 md:p-8">
+                {step === 0 && (
+                  <div className="space-y-9">
+                    <div className="grid gap-8 md:grid-cols-2">
                       <Field
-                        value={keywordInput}
-                        onChange={(event) => setKeywordInput(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            event.preventDefault();
-                            addKeyword();
-                          }
-                        }}
-                        placeholder="Lipid Nanoparticles"
+                        label="First Name"
+                        requiredMark
+                        value={formData.firstName}
+                        onChange={(event) => update({ firstName: event.target.value })}
+                        placeholder="Enter first name"
                       />
-                      <MyButton onClick={addKeyword} disabled={!keywordInput.trim()} className="h-12">
-                        Add
-                      </MyButton>
+                      <Field
+                        label="Last Name"
+                        requiredMark
+                        value={formData.lastName}
+                        onChange={(event) => update({ lastName: event.target.value })}
+                        placeholder="Enter last name"
+                      />
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {formData.keywords.map((keyword) => (
-                        <button
-                          key={keyword}
-                          type="button"
-                          onClick={() => update({ keywords: formData.keywords.filter((item) => item !== keyword) })}
-                        >
-                          <Tag>{keyword}</Tag>
-                        </button>
+                    <Field
+                      label="Email"
+                      requiredMark
+                      type="email"
+                      value={formData.email}
+                      onChange={(event) => update({ email: event.target.value })}
+                      placeholder="Enter email"
+                    />
+                    <Field
+                      label="Institution/Organization Affiliation"
+                      requiredMark
+                      value={formData.institution}
+                      onChange={(event) => update({ institution: event.target.value })}
+                      placeholder="Enter institution or organization"
+                    />
+                  </div>
+                )}
+
+                {step === 1 && (
+                  <div className="space-y-8">
+                    <div>
+                      <h2 className="text-lg font-medium text-black">Tell us about yourself</h2>
+                      <p className="mt-2 text-base text-black">This helps us find your best matches</p>
+                    </div>
+                    <div>
+                      <h3 className="mb-3 text-lg font-medium text-black">Your Role</h3>
+                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        {ROLE_OPTIONS.map((role) => (
+                          <ChoiceCard key={role} label={role} selected={formData.role === role} onClick={() => update({ role })} />
+                        ))}
+                      </div>
+                    </div>
+                    <SelectField
+                      label="Career Stage"
+                      value={formData.careerStage}
+                      onChange={(event) => update({ careerStage: event.target.value })}
+                    >
+                      {CAREER_STAGES.map((stage) => (
+                        <option key={stage.value} value={stage.value}>
+                          {stage.label}
+                        </option>
+                      ))}
+                    </SelectField>
+                  </div>
+                )}
+
+                {step === 2 && (
+                  <div className="space-y-8">
+                    <div>
+                      <h2 className="text-lg font-medium text-black">Research Interests</h2>
+                      <p className="mt-2 text-base text-black">Select areas and add specific keywords</p>
+                    </div>
+                    <div>
+                      <h3 className="mb-3 text-xl font-medium text-black">Research Areas</h3>
+                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        {RESEARCH_AREAS.map((area) => (
+                          <ChoiceCard key={area} label={area} selected={formData.selectedAreas.includes(area)} onClick={() => toggleArea(area)} />
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="mb-3 text-lg font-medium text-black">Additional Keywords</h3>
+                      <div className="grid gap-4 md:grid-cols-[1fr_208px]">
+                        <Field
+                          value={keywordInput}
+                          onChange={(event) => setKeywordInput(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault();
+                              addKeyword();
+                            }
+                          }}
+                          placeholder="Lipid Nanoparticles"
+                        />
+                        <MyButton onClick={addKeyword} disabled={!keywordInput.trim()} className="h-12">
+                          Add
+                        </MyButton>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {formData.keywords.map((keyword) => (
+                          <button
+                            key={keyword}
+                            type="button"
+                            onClick={() => update({ keywords: formData.keywords.filter((item) => item !== keyword) })}
+                          >
+                            <Tag>{keyword}</Tag>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {step === 3 && (
+                  <div className="space-y-8">
+                    <div>
+                      <h2 className="text-lg font-medium text-black">Conference Goals</h2>
+                      <p className="mt-2 text-base text-black">Choose what you want to get out of ARDD 2026.</p>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {GOALS.map((goal) => (
+                        <ChoiceCard key={goal} label={goal} selected={formData.goals.includes(goal)} onClick={() => toggleGoal(goal)} />
                       ))}
                     </div>
+                    <div className="rounded-lg border border-[#4a9b8e] bg-[#deefec] p-5 text-[#195c52]">
+                      <p className="text-2xl font-semibold">{fullName || 'Your profile'}</p>
+                      <p className="mt-2 text-sm">
+                        {formData.role || 'Role'} at {formData.institution || 'your institution'}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
-              {step === 3 && (
-                <div className="space-y-8">
-                  <div>
-                    <h2 className="text-lg font-medium text-black">Conference Goals</h2>
-                    <p className="mt-2 text-base text-black">Choose what you want to get out of ARDD 2026.</p>
-                  </div>
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {GOALS.map((goal) => (
-                      <ChoiceCard key={goal} label={goal} selected={formData.goals.includes(goal)} onClick={() => toggleGoal(goal)} />
-                    ))}
-                  </div>
-                  <div className="rounded border border-[#4a9b8e] bg-[#deefec] p-5 text-[#195c52]">
-                    <p className="text-2xl font-semibold">{fullName || 'Your profile'}</p>
-                    <p className="mt-2 text-sm">
-                      {formData.role || 'Role'} at {formData.institution || 'your institution'}
-                    </p>
-                  </div>
-                </div>
-              )}
+              <OnboardingSummary formData={formData} fullName={fullName} />
             </div>
 
             <div className="mt-8">
@@ -415,6 +434,59 @@ export default function OnboardingForm() {
   );
 }
 
+function OnboardingSummary({ formData, fullName }: { formData: OnboardingData; fullName: string }) {
+  const selectedSignals = [...formData.selectedAreas, ...formData.keywords].filter(Boolean).slice(0, 8);
+
+  return (
+    <aside className="h-max rounded-lg border border-zinc-200 bg-[#f8fbfa] p-5">
+      <div className="flex items-center gap-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#deefec] text-sm font-bold text-[#195c52]">
+          {getInitials(fullName)}
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-base font-semibold text-black">{fullName || 'Your profile'}</p>
+          <p className="truncate text-sm text-zinc-500">{formData.institution || 'Institution pending'}</p>
+        </div>
+      </div>
+
+      <div className="mt-5 space-y-4 text-sm">
+        <SummaryRow label="Role" value={formData.role || 'Not selected'} />
+        <SummaryRow label="Career Stage" value={formatStage(formData.careerStage)} />
+        <div>
+          <p className="mb-2 font-medium text-black">Research Signals</p>
+          <div className="flex flex-wrap gap-2">
+            {selectedSignals.length ? selectedSignals.map((signal) => <Tag key={signal}>{signal}</Tag>) : <span className="text-zinc-500">None yet</span>}
+          </div>
+        </div>
+        <div>
+          <p className="mb-2 font-medium text-black">Goals</p>
+          <div className="flex flex-wrap gap-2">
+            {formData.goals.length ? formData.goals.map((goal) => <Tag key={goal}>{goal}</Tag>) : <span className="text-zinc-500">None yet</span>}
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="font-medium text-black">{label}</p>
+      <p className="mt-1 text-zinc-500">{value}</p>
+    </div>
+  );
+}
+
 function normalizeKeyword(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function formatStage(value: string) {
+  return value.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? 'M') + (parts[1]?.[0] ?? '')).toUpperCase();
 }
