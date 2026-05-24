@@ -9,6 +9,27 @@ Two surfaces:
 
 ---
 
+## Table of contents
+
+- [Tech stack](#tech-stack)
+- [Project structure](#project-structure)
+- [Local setup](#local-setup)
+  - [Daily startup](#daily-startup-every-time-you-sit-down-to-work)
+  - [First-time setup](#first-time-setup)
+    - [Frontend (Mycellium app)](#frontend-mycellium-app)
+    - [Backend (REST API + Socket.IO + Slack bot)](#backend-rest-api--socketio--slack-bot)
+- [`/ardd` Slack bot](#ardd-slack-bot)
+  - [Subcommands](#subcommands)
+  - [Daily digest](#daily-digest)
+  - [Setup walkthrough](#setup-walkthrough)
+  - [Demo data](#demo-data)
+  - [Archive export](#archive-export)
+  - [Adding a new subcommand](#adding-a-new-subcommand)
+  - [User contribution slots](#user-contribution-slots)
+- [Troubleshooting](#troubleshooting)
+
+---
+
 ## Tech stack
 
 | Layer | Choice | Notes |
@@ -57,55 +78,89 @@ Two surfaces:
 
 ## Local setup
 
-### Prerequisites
+### Daily startup (every time you sit down to work)
+
+Open **two terminal tabs** in the repo root.
+
+```bash
+# Tab 1 — backend
+cd backend && npm run dev          # → http://localhost:3001
+
+# Tab 2 — frontend
+npm run dev                        # → http://localhost:3000
+```
+
+Open <http://localhost:3000>. Stop with `Ctrl+C` in each tab.
+
+Quick health check (any tab):
+
+```bash
+curl -sS -o /dev/null -w "frontend %{http_code}\n" http://localhost:3000
+curl -sS -o /dev/null -w "backend  %{http_code}\n" http://localhost:3001/api/attendees/filters
+```
+
+Both should print `200`. If a port is busy from a previous session: `kill $(lsof -ti:3000)` or `:3001`.
+
+### First-time setup
+
+Only needed after a fresh clone or after the schema changes.
+
+#### Prerequisites
 
 - Node.js ≥ 18 (recommended ≥ 20)
 - npm (the lockfiles are npm-format)
 - A Supabase project (free tier is fine) — get the project ref + database password ready
-- A Slack workspace where you can install custom apps
+- A Slack workspace where you can install custom apps (only needed for `/ardd`)
 
 The frontend and backend are separate npm projects. They run side-by-side: frontend on `http://localhost:3000`, backend on `http://localhost:3001`.
 
-### Frontend (Mycellium app)
+#### Frontend (Mycellium app)
 
 ```bash
 # From repo root
-cp .env.example .env.local
-# Fill in NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
+npm run setup
+# → copies .env.example to .env.local (if missing) and runs npm install
+
+# Edit .env.local — fill in:
+#   NEXT_PUBLIC_SUPABASE_URL
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY
 # (Find these in Supabase Dashboard → Project Settings → API)
 
-npm install
 npm run dev
 # → http://localhost:3000
 ```
 
 `NEXT_PUBLIC_API_URL` defaults to `http://localhost:3001`; only change it if the backend runs elsewhere.
 
-### Backend (REST API + Socket.IO + Slack bot)
-
-See the [bot setup walkthrough](#setup-walkthrough) below for the complete sequence including Slack tokens. The TL;DR for the **REST API alone** (no Slack bot) is:
+#### Backend (REST API + Socket.IO + Slack bot)
 
 ```bash
 cd backend
-cp .env.example .env
-# Fill in DATABASE_URL, DIRECT_URL, SUPABASE_URL (see Section 2 of the bot walkthrough for pooler URL details)
+npm run setup
+# → copies .env.example to .env (if missing), runs npm install, runs prisma generate
 
-npm install
-npx prisma generate
+# Edit .env — fill in:
+#   DATABASE_URL, DIRECT_URL, SUPABASE_URL
+# (Use the Supavisor pooler URLs — see the gotcha box below.)
+
 npx prisma db push
 npm run dev
 # → http://localhost:3001
 ```
 
-`ENABLE_SLACK_BOT` and `ENABLE_DAILY_DIGEST_CRON` default to `false`, so this runs the REST API only and never touches Slack.
+> **⚠️ Database URL gotcha.** Supabase's **direct** connection (`db.<project>.supabase.co:5432`) is **IPv6-only** since 2024 and fails on most home / office / CI networks. Use the **Supavisor pooler** instead — see [Setup walkthrough Section 2](#2-get-the-supabase-connection-string) below for the exact format.
+
+`ENABLE_SLACK_BOT` and `ENABLE_DAILY_DIGEST_CRON` default to `false`, so this runs the REST API only and never touches Slack. To turn on the bot and cron, see [`/ardd` Slack bot](#ardd-slack-bot) below.
 
 ---
 
-## ARDD Community Bot — `/ardd`
+## `/ardd` Slack bot
 
 A single Slack slash command with subcommands, deployed via Socket Mode so the bot runs from a developer laptop with no public URL or ngrok.
 
 ### Subcommands
+
+**Look up info** (anyone can run):
 
 | Command | What it does |
 |---------|--------------|
@@ -113,13 +168,32 @@ A single Slack slash command with subcommands, deployed via Socket Mode so the b
 | `/ardd next [N]` | Next N upcoming sessions (default 3, max 10) |
 | `/ardd schedule [day1\|day2\|today]` | Full schedule for the given day |
 | `/ardd speaker <name>` | Speaker info — substring match on speaker names |
-| `/ardd note` | Open a modal to submit a note / impression for a session |
 | `/ardd notes <session_id>` | Latest 20 notes for a session (use the 8-char ID shown by `/ardd now`) |
-| `/ardd announce <text>` | Admin-only: broadcast an announcement to the digest channel |
-| `/ardd digest` | Ephemeral preview of today's daily digest (does NOT post or persist) |
 | `/ardd help` | This list |
 
-Run from the main message composer — Slack does not deliver developer slash commands inside threads.
+**Submit info** (anyone can run):
+
+| Command | What it does |
+|---------|--------------|
+| `/ardd note` | Open a modal to submit a note / impression for a session |
+
+**Admin-only:**
+
+| Command | What it does |
+|---------|--------------|
+| `/ardd announce <text>` | Broadcast an announcement to the digest channel (gated by `ADMIN_SLACK_USER_IDS`) |
+
+**Preview / diagnostics:**
+
+| Command | What it does |
+|---------|--------------|
+| `/ardd digest` | Ephemeral preview of today's daily digest (does **not** post, does **not** persist) |
+
+> ⚠️ **`/ardd note` and `/ardd notes` are two different commands** — singular opens a modal to *write* a note; plural lists notes *for a session*. Easy to confuse, mind the `s`.
+
+Unrecognised subcommands (`/ardd foo`) return the help text instead of erroring.
+
+Run all commands from the main message composer — Slack does not deliver developer slash commands inside threads.
 
 ### Daily digest
 
@@ -236,29 +310,18 @@ npx tsx scripts/export-archive.ts > archive.json
 
 Exports `sessions`, `session_impressions`, `announcements`, `bot_messages`, `daily_digest_runs`. Profile/match/messaging tables are out of scope for the bot archive.
 
----
+### Adding a new subcommand
 
-## Architecture notes
+If you want to extend the bot with a new `/ardd <something>`, edit four places:
 
-The bot's design has a few non-obvious choices worth knowing before changing things:
+1. **`backend/src/bot/handlers/<name>.ts`** — new handler that returns a `HandlerResult`. Copy `help.ts` or `now.ts` as a template.
+2. **`backend/src/bot/dispatch.ts`** — add a `case "<name>":` that calls your handler.
+3. **`backend/src/bot/handlers/help.ts`** — add a `• \`/ardd <name>\` — ...` line so it shows up in `/ardd help`.
+4. **This README** — add a row to the [Subcommands](#subcommands) table so it stays an accurate source of truth.
 
-- **Socket Mode over webhooks** — `@slack/bolt@^4` opens a websocket to Slack instead of expecting Slack to POST to a public URL. This is what makes ngrok unnecessary. Production deployments could switch to HTTP receiver with `SLACK_SIGNING_SECRET`, but everything in the bot's wiring works under either model.
+Slack's 3-second `ack()` deadline applies to every handler — do not run DB or network work before `await ack()` in the entry point. See [Troubleshooting](#troubleshooting) for the `operation_timeout` row if you hit this.
 
-- **Supavisor pooler over direct Postgres** — see Section 2 of the bot setup walkthrough. Direct connection is IPv6-only on Supabase now, so the pooler is the only path that works on most networks.
-
-- **`conference_date_key` is a `String`, not a `DateTime`** — `"YYYY-MM-DD"` in `CONFERENCE_TIMEZONE`. JS `Date` representations of midnight tend to drift across UTC offsets and DST, especially when displayed in `prisma studio`. Sticking to a string sidesteps the whole class of timezone bugs at the cost of needing `date-fns-tz` at write time.
-
-- **`getEffectiveNow()` is the only place we read "now"** — `backend/src/lib/time.ts`. Every now/today/digest decision routes through it, so `DEMO_NOW_ISO` shifts the entire bot's perception of time without code changes.
-
-- **`ack()` is the first awaited operation in every slash handler** — Slack enforces a 3-second deadline, and `trigger_id` for modal opens expires ~3 seconds after the originating interaction. Any DB query or rendering before `ack()` risks `operation_timeout`. The `/ardd note` modal uses a `modal-cache` warmed at startup so views.open never blocks on a DB call.
-
-- **`safeArchive` over plain `archive`** — `bot_messages` writes are wrapped in try/catch and only log on failure. The user has already received their Slack reply by the time archive runs; a DB hiccup must not surface a `:warning:` after success.
-
-- **Bot users are not required to be app users** — `announcements.posted_by_profile_id` and `session_impressions.attendee_id` are nullable. The canonical identity is `slack_user_id`. Profile mapping is deferred unless `profiles.slack_user_id` is added later.
-
-- **Bot + cron are gated by env, off by default** — `ENABLE_SLACK_BOT` and `ENABLE_DAILY_DIGEST_CRON` keep them dormant unless explicitly turned on. This stops tests and scripts that just import `index.ts` from accidentally connecting to Slack or scheduling jobs.
-
-## User contribution slots
+### User contribution slots
 
 Three places in the code are intentionally left as small decision points for whoever takes the bot further:
 
@@ -266,13 +329,15 @@ Three places in the code are intentionally left as small decision points for who
 2. **Daily digest format** — `backend/src/services/digest.service.ts` `composeDigest()`. Default is chronological with up to two quoted impressions per session. Reshape into highlight reels, anonymise impressions, or call an LLM — the data assembly (`gatherDigestData()`) is decoupled from formatting.
 3. **`/ardd now` soft window** — `softWindowMinutes` parameter to `getNow()` in `backend/src/services/session-query.service.ts`. MVP is 5 minutes. Tune for the trade-off between "show me what's literally happening" vs. "show me what people are likely asking about".
 
+---
+
 ## Troubleshooting
 
 Real errors that came up during setup:
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `Can't reach database server at db.<ref>.supabase.co:5432` | Direct connection is IPv6-only; your network probably has no IPv6 | Switch `DATABASE_URL` / `DIRECT_URL` to the Supavisor pooler URLs (see setup Section 2). |
+| `Can't reach database server at db.<ref>.supabase.co:5432` | Direct connection is IPv6-only; your network probably has no IPv6 | Switch `DATABASE_URL` / `DIRECT_URL` to the Supavisor pooler URLs (see [Setup walkthrough Section 2](#2-get-the-supabase-connection-string)). |
 | `prepared statement "s0" already exists` | Transaction pooler does not preserve session-state across queries; Prisma's default prepared statements break | Append `?pgbouncer=true&connection_limit=1` to `DATABASE_URL`. |
 | `FATAL: Tenant or user not found` from pooler | Pooler hostname uses `aws-1-<region>` (or `aws-0-<region>`) — wrong one returns this; username is `postgres.<project-ref>`, not just `postgres` | Copy the exact URL from Supabase Dashboard → Connect. |
 | `Property 'sessions' does not exist on type 'PrismaClient<...>'` (LSP / `tsc`) | Prisma client was generated before the bot models were added | `cd backend && npx prisma generate`. |
@@ -282,14 +347,3 @@ Real errors that came up during setup:
 | `/ardd announce` denied for an admin | The dev server was started before `ADMIN_SLACK_USER_IDS` was set or changed | Restart the dev server — `.env` is loaded once at startup. |
 | `/ardd now` always empty even with sessions seeded | The system clock is outside the conference window | Set `DEMO_NOW_ISO=…` in `.env` and restart. |
 | `db push` refuses with "Made the column required" errors | A NOT NULL column has rows that are NULL | Run `npx tsx prisma/backfill-conference-dates.ts`, verify no NULL rows remain, then re-`db push`. |
-
-## What's out of scope for this MVP
-
-- Production deploy (Vercel / Fly / Railway) — the bot is designed for Socket Mode dev.
-- Telegram support — track spec only required a single platform.
-- Speaker photos in `/ardd speaker` blocks — Slack `image_url` requires stable public hosting; defer to Cloudinary / Supabase Storage.
-- AI-summarised digests — `composeDigest()` is intentionally deterministic with a clear contribution slot.
-- `external_select` for `/ardd note` — demo has ~10 sessions, well under the 100-option static-select cap.
-- Distributed cron locking, retry queues, observability — this is demo-ready, not production-quality.
-
-See `docs/ardd-slack-bot/` (gitignored, local-only) for the detailed implementation plan, schema reference, and Slack setup walkthrough.

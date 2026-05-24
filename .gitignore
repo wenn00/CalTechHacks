@@ -40,7 +40,7 @@ next-env.d.ts
 memory/
 
 # local working notes — gitignored on purpose
-docs/
+my_note/
 
 # git worktrees
 .worktrees/

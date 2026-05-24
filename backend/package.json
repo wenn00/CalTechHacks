@@ -4,6 +4,7 @@
   "description": "ARDD Conference networking platform — attendee directory backend",
   "main": "dist/index.js",
   "scripts": {
+    "setup": "cp -n .env.example .env || true && npm install && prisma generate",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
