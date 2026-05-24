@@ -168,7 +168,8 @@ export default function DirectoryPage() {
   const [drawerMode, setDrawerMode] = useState<'match' | 'profile'>('match');
   const [loading, setLoading] = useState(true);
   const [matchesLoading, setMatchesLoading] = useState(true);
-  const [matchStatus, setMatchStatus] = useState<'idle' | 'connected' | 'error'>('idle');
+  const [matchStatus, setMatchStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
+  const [matchesNotice, setMatchesNotice] = useState<string | null>(null);
   const [attendeeApiFailed, setAttendeeApiFailed] = useState(false);
 
   const [q, setQ] = useState('');
@@ -221,6 +222,7 @@ export default function DirectoryPage() {
     const token = data.session?.access_token;
     if (!token) {
       setMatches([]);
+      setMatchesNotice('Sign in to see ranked matches. Directory browsing is still available.');
       setMatchesLoading(false);
       return;
     }
@@ -230,9 +232,12 @@ export default function DirectoryPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const json = await response.json();
-      setMatches(response.ok && Array.isArray(json.data) ? json.data : []);
+      const rows = response.ok && Array.isArray(json.data) ? json.data : [];
+      setMatches(rows);
+      setMatchesNotice(rows.length ? null : 'No ranked matches yet. Showing the directory network for now.');
     } catch {
       setMatches([]);
+      setMatchesNotice('Matches could not be loaded. Showing the directory network for now.');
     } finally {
       setMatchesLoading(false);
     }
@@ -272,16 +277,13 @@ export default function DirectoryPage() {
     setMatchStatus('idle');
   };
 
-  const openChat = async () => {
+  const recordConnect = async () => {
     if (!selected) return;
-    // Demo people have non-UUID ids ("demo-sc", "demo-0", …) and aren't in
-    // the messaging DB — bail early with a friendly message instead of a
-    // 400 from the server.
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selected.id);
-    if (!isUuid) {
-      alert('This is a demo profile — sign in and pick a real attendee to start a chat.');
+    if (selected.id.startsWith('demo-')) {
+      setMatchStatus('connected');
       return;
     }
+
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
     if (!token) {
@@ -289,23 +291,17 @@ export default function DirectoryPage() {
       return;
     }
 
-    setMatchStatus('idle');
+    setMatchStatus('connecting');
     try {
-      const response = await fetch(`${API}/api/messages/conversations`, {
+      const response = await fetch(`${API}/api/matches/swipe`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ participantId: selected.id }),
+        body: JSON.stringify({ targetId: selected.id, action: 'connect' }),
       });
-      const json = await response.json().catch(() => null);
-      if (!response.ok || !json?.data?.id) {
-        setMatchStatus('error');
-        alert(json?.error || 'Could not start conversation');
-        return;
-      }
-      router.push(`/messages?c=${json.data.id}`);
+      setMatchStatus(response.ok ? 'connected' : 'error');
     } catch {
       setMatchStatus('error');
     }
@@ -368,10 +364,18 @@ export default function DirectoryPage() {
             )}
 
             <section className="relative min-h-[560px] overflow-hidden bg-white">
-              <NetworkGraph people={people} loading={isGraphLoading} selectedId={selected?.id} onSelect={openPerson} />
+              <NetworkNotice
+                show={attendeeApiFailed || (view === 'matches' && Boolean(matchesNotice))}
+                text={attendeeApiFailed ? 'Attendee API is unavailable. Demo profiles are shown so the network stays usable.' : matchesNotice}
+              />
+
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+                <NetworkGraph people={people} loading={isGraphLoading} selectedId={selected?.id} onSelect={openPerson} />
+                <PeopleList people={people} loading={isGraphLoading} selectedId={selected?.id} onSelect={openPerson} />
+              </div>
 
               {view === 'directory' && (meta.totalPages ?? 1) > 1 && (
-                <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 rounded-full border border-zinc-200 bg-white/90 px-4 py-2 shadow-sm backdrop-blur">
+                <div className="mx-auto mt-4 flex w-max items-center gap-3 rounded-full border border-zinc-200 bg-white/90 px-4 py-2 shadow-sm backdrop-blur">
                   <button
                     type="button"
                     onClick={() => setPage((current) => Math.max(1, current - 1))}
@@ -404,11 +408,21 @@ export default function DirectoryPage() {
           mode={drawerMode}
           setMode={setDrawerMode}
           onClose={() => setSelected(null)}
-          onMessage={openChat}
+          onMessage={recordConnect}
           matchStatus={matchStatus}
         />
       )}
     </main>
+  );
+}
+
+function NetworkNotice({ show, text }: { show: boolean; text: string | null }) {
+  if (!show || !text) return null;
+
+  return (
+    <div className="mb-4 rounded border border-[#b8cac7] bg-[#f4faf8] px-4 py-3 text-sm leading-5 text-[#195c52]">
+      {text}
+    </div>
   );
 }
 
@@ -509,6 +523,75 @@ function FilterPanel(props: {
   );
 }
 
+function PeopleList({
+  people,
+  loading,
+  selectedId,
+  onSelect,
+}: {
+  people: NetworkPerson[];
+  loading: boolean;
+  selectedId?: string;
+  onSelect: (person: NetworkPerson) => void;
+}) {
+  if (loading) {
+    return (
+      <aside className="hidden xl:block">
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div key={index} className="h-[92px] animate-pulse rounded-lg border border-zinc-100 bg-zinc-50" />
+          ))}
+        </div>
+      </aside>
+    );
+  }
+
+  if (!people.length) return null;
+
+  return (
+    <aside className="xl:max-h-[calc(100vh-154px)] xl:overflow-y-auto xl:pr-1">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold uppercase text-zinc-400">People</h2>
+        <span className="text-xs text-zinc-400">{people.length} shown</span>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+        {people.slice(0, 12).map((person) => {
+          const selected = selectedId === person.id;
+          return (
+            <button
+              key={person.id}
+              type="button"
+              onClick={() => onSelect(person)}
+              className={`rounded-lg border bg-white p-3 text-left transition hover:border-[#4a9b8e] hover:bg-[#f4faf8] ${
+                selected ? 'border-[#4a9b8e] shadow-[0_0_0_1px_#4a9b8e]' : 'border-zinc-200'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#deefec] text-sm font-semibold text-[#195c52]">
+                  {initials(person.name)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-semibold text-black">{person.name}</p>
+                    {typeof person.score === 'number' && (
+                      <span className="rounded-full bg-[#195c52] px-2 py-0.5 text-[10px] font-bold text-white">
+                        {formatScore(person.score)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-zinc-500">
+                    {[person.role, person.institution, person.research_area].filter(Boolean).join(' - ') || formatStage(person.career_stage)}
+                  </p>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </aside>
+  );
+}
+
 function NetworkGraph({
   people,
   loading,
@@ -538,7 +621,7 @@ function NetworkGraph({
   }
 
   return (
-    <div className="relative mx-auto h-[560px] max-w-[760px] md:h-[calc(100vh-120px)] md:min-h-[640px]">
+    <div className="relative mx-auto h-[560px] w-full max-w-[760px] md:h-[calc(100vh-150px)] md:min-h-[640px]">
       <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
         {EDGES.filter(([a, b]) => a < nodes.length && b < nodes.length).map(([a, b]) => {
           const from = NODE_POSITIONS[a]!;
@@ -594,8 +677,10 @@ function ProfileDrawer({
   setMode: (mode: 'match' | 'profile') => void;
   onClose: () => void;
   onMessage: () => void;
-  matchStatus: 'idle' | 'connected' | 'error';
+  matchStatus: 'idle' | 'connecting' | 'connected' | 'error';
 }) {
+  const hasMatchSummary = typeof person.score === 'number';
+
   return (
     <div className="fixed inset-0 z-50 bg-black/20 backdrop-blur-[2px]" onClick={onClose}>
       <aside
@@ -622,7 +707,7 @@ function ProfileDrawer({
         </div>
 
         <div className="flex-1 overflow-y-auto border-t border-zinc-200 px-6 py-6">
-          {mode === 'match' ? (
+          {mode === 'match' && hasMatchSummary ? (
             <div className="space-y-4">
               <div className="rounded-[15px] bg-[#deefec] px-5 py-3 text-center text-[#195c52]">
                 <p className="text-4xl font-semibold leading-tight">{typeof person.score === 'number' ? formatScore(person.score) : '76%'}</p>
@@ -630,7 +715,7 @@ function ProfileDrawer({
               </div>
 
               <DrawerSection title="Why you're matched">
-                  <p className="text-sm leading-6">
+                <p className="text-sm leading-6">
                   {person.explanation || 'Shared research signals and complementary conference goals make this a useful person to meet.'}
                 </p>
               </DrawerSection>
@@ -704,11 +789,15 @@ function ProfileDrawer({
         </div>
 
         <div className="grid grid-cols-2 gap-3 border-t border-zinc-100 bg-white px-5 py-4">
-          <MyButton variant="ghost" onClick={() => setMode(mode === 'match' ? 'profile' : 'match')}>
+          <MyButton
+            variant="ghost"
+            onClick={() => setMode(mode === 'match' ? 'profile' : 'match')}
+            disabled={!hasMatchSummary}
+          >
             {mode === 'match' ? 'Full Profile' : 'Match Summary'}
           </MyButton>
-          <MyButton onClick={onMessage}>
-            {matchStatus === 'connected' ? 'Connected' : matchStatus === 'error' ? 'Try Again' : 'Message'}
+          <MyButton onClick={onMessage} disabled={matchStatus === 'connecting' || matchStatus === 'connected'}>
+            {matchStatus === 'connecting' ? 'Connecting...' : matchStatus === 'connected' ? 'Connected' : matchStatus === 'error' ? 'Try Again' : 'Message'}
           </MyButton>
         </div>
       </aside>
