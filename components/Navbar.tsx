@@ -56,7 +56,13 @@ export default function Navbar() {
   };
 
   // Figma-driven screens provide their own navigation/chrome.
-  if (pathname === '/login' || pathname?.startsWith('/onboarding') || pathname === '/directory') return null;
+  if (
+    pathname === '/login' ||
+    pathname?.startsWith('/onboarding') ||
+    pathname === '/directory' ||
+    pathname === '/schedule' ||
+    pathname === '/map'
+  ) return null;
 
   return (
     <nav className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-6">

@@ -180,6 +180,24 @@ export default function DirectoryPage() {
   const [page, setPage] = useState(1);
 
   useEffect(() => {
+    const requestedView = new URLSearchParams(window.location.search).get('view');
+    if (requestedView === 'directory' || requestedView === 'matches') {
+      setView(requestedView);
+    }
+  }, []);
+
+  const updateView = (nextView: 'directory' | 'matches') => {
+    setView(nextView);
+    const url = new URL(window.location.href);
+    if (nextView === 'matches') {
+      url.searchParams.set('view', 'matches');
+    } else {
+      url.searchParams.delete('view');
+    }
+    window.history.replaceState(null, '', `${url.pathname}${url.search}`);
+  };
+
+  useEffect(() => {
     fetch(`${API}/api/attendees/filters`)
       .then((response) => response.json())
       .then(({ data }) => setFilters(data ?? { researchAreas: [], institutions: [], careerStages: [], roles: [] }))
@@ -310,7 +328,7 @@ export default function DirectoryPage() {
   return (
     <main className="min-h-screen bg-white text-black">
       <div className="md:flex">
-        <AppSidebar view={view} onViewChange={setView} />
+        <AppSidebar view={view} onViewChange={updateView} />
 
         <section className="min-h-screen flex-1 px-5 py-6 lg:px-8">
           <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

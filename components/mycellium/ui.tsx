@@ -1,8 +1,10 @@
 'use client';
 
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react';
+import { useRouter } from 'next/navigation';
 
 const navIconClass = 'h-5 w-5';
+type SidebarSection = 'directory' | 'matches' | 'schedule' | 'messages' | 'map';
 
 type BrandRailProps = {
   children?: ReactNode;
@@ -28,11 +30,23 @@ export function BrandRail({ children, className = '' }: BrandRailProps) {
 }
 
 type AppSidebarProps = {
-  view: 'directory' | 'matches';
-  onViewChange: (view: 'directory' | 'matches') => void;
+  view?: 'directory' | 'matches';
+  onViewChange?: (view: 'directory' | 'matches') => void;
+  activeSection?: SidebarSection;
 };
 
-export function AppSidebar({ view, onViewChange }: AppSidebarProps) {
+export function AppSidebar({ view = 'directory', onViewChange, activeSection }: AppSidebarProps) {
+  const router = useRouter();
+  const active = activeSection ?? view;
+
+  const openNetworkView = (nextView: 'directory' | 'matches') => {
+    if (onViewChange) {
+      onViewChange(nextView);
+      return;
+    }
+    router.push(nextView === 'matches' ? '/directory?view=matches' : '/directory');
+  };
+
   return (
     <aside className="flex border-zinc-200 bg-white md:sticky md:top-0 md:h-screen md:min-h-screen md:w-[92px] md:border-r lg:w-[260px]">
       <div className="flex w-full items-center justify-between gap-4 overflow-x-auto px-4 py-3 md:h-full md:flex-col md:items-stretch md:overflow-hidden md:p-8">
@@ -40,20 +54,20 @@ export function AppSidebar({ view, onViewChange }: AppSidebarProps) {
           <img src="/mycellium/logo.png" alt="Mycellium" className="h-10 w-10 object-contain object-left lg:h-20 lg:w-48" />
           <nav className="flex items-center gap-2 md:flex-col md:items-stretch md:gap-4">
             <SidebarButton
-              active={view === 'directory'}
+              active={active === 'directory'}
               icon={<HomeIcon />}
               label="Directory"
-              onClick={() => onViewChange('directory')}
+              onClick={() => openNetworkView('directory')}
             />
             <SidebarButton
-              active={view === 'matches'}
+              active={active === 'matches'}
               icon={<CompareIcon />}
               label="Matches"
-              onClick={() => onViewChange('matches')}
+              onClick={() => openNetworkView('matches')}
             />
-            <SidebarButton icon={<CalendarIcon />} label="Schedule" disabled />
-            <SidebarButton icon={<MessagesIcon />} label="Messages" disabled />
-            <SidebarButton icon={<MapIcon />} label="Map" disabled />
+            <SidebarButton active={active === 'schedule'} icon={<CalendarIcon />} label="Schedule" onClick={() => router.push('/schedule')} />
+            <SidebarButton active={active === 'messages'} icon={<MessagesIcon />} label="Messages" onClick={() => router.push('/messages')} />
+            <SidebarButton active={active === 'map'} icon={<MapIcon />} label="Map" onClick={() => router.push('/map')} />
           </nav>
         </div>
         <div className="hidden items-center justify-between lg:flex">
