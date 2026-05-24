@@ -15,7 +15,7 @@ export async function listAttendees(req: Request, res: Response, next: NextFunct
 
 export async function getAttendee(req: Request, res: Response, next: NextFunction) {
   try {
-    const profile = await attendeeService.getAttendeeById(req.params.id);
+    const profile = await attendeeService.getAttendeeById(req.params.id as string);
     if (!profile) return fail(res, "Attendee not found", 404);
     ok(res, profile);
   } catch (err) {

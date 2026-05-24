@@ -14,7 +14,7 @@ export async function getMatches(req: AuthRequest, res: Response, next: NextFunc
 
 export async function getOverlap(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const overlap = await svc.getOverlap(req.user!.id, req.params.profileId);
+    const overlap = await svc.getOverlap(req.user!.id, req.params.profileId as string);
     if (!overlap) return fail(res, "Profile not found", 404);
     ok(res, overlap);
   } catch (err) { next(err); }
@@ -64,6 +64,6 @@ export async function addPublication(req: AuthRequest, res: Response, next: Next
 
 export async function getPublications(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    ok(res, await svc.getPublications(req.params.profileId));
+    ok(res, await svc.getPublications(req.params.profileId as string));
   } catch (err) { next(err); }
 }

@@ -18,7 +18,7 @@ export async function getGraph(req: Request, res: Response, next: NextFunction) 
 
 export async function getNode(req: Request, res: Response, next: NextFunction) {
   try {
-    const node = await svc.getNode(req.params.id);
+    const node = await svc.getNode(req.params.id as string);
     if (!node) return fail(res, "Profile not found", 404);
     ok(res, node);
   } catch (err) { next(err); }

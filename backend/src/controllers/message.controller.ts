@@ -23,7 +23,7 @@ export async function listConversations(req: AuthRequest, res: Response, next: N
 
 export async function getConversation(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const conv = await svc.getConversationById(req.params.id, req.user!.id);
+    const conv = await svc.getConversationById(req.params.id as string, req.user!.id);
     if (!conv) return fail(res, "Conversation not found", 404);
     ok(res, conv);
   } catch (err) { next(err); }
@@ -32,7 +32,7 @@ export async function getConversation(req: AuthRequest, res: Response, next: Nex
 export async function getMessages(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { cursor, limit } = messagesQuerySchema.parse(req.query);
-    const result = await svc.getMessages(req.params.id, req.user!.id, cursor, limit);
+    const result = await svc.getMessages(req.params.id as string, req.user!.id, cursor, limit);
     if (!result) return fail(res, "Conversation not found or access denied", 404);
     ok(res, result);
   } catch (err) { next(err); }
@@ -40,7 +40,7 @@ export async function getMessages(req: AuthRequest, res: Response, next: NextFun
 
 export async function sendMessage(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const message = await svc.saveMessage(req.params.id, req.user!.id, req.body.content);
+    const message = await svc.saveMessage(req.params.id as string, req.user!.id, req.body.content);
     if (!message) return fail(res, "Conversation not found or access denied", 404);
     ok(res, message, 201);
   } catch (err) { next(err); }
@@ -48,7 +48,7 @@ export async function sendMessage(req: AuthRequest, res: Response, next: NextFun
 
 export async function markRead(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    await svc.markRead(req.params.id, req.user!.id);
+    await svc.markRead(req.params.id as string, req.user!.id);
     ok(res, { marked: true });
   } catch (err) { next(err); }
 }
