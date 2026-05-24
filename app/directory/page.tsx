@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -37,11 +39,44 @@ interface Meta {
 }
 
 export default function DirectoryPage() {
+  const router = useRouter();
   const [attendees, setAttendees]     = useState<Attendee[]>([]);
   const [filters, setFilters]         = useState<FilterOptions>({ researchAreas: [], institutions: [], careerStages: [], roles: [] });
   const [meta, setMeta]               = useState<Meta>({ page: 1, limit: 12, total: 0, totalPages: 1 });
   const [selected, setSelected]       = useState<Attendee | null>(null);
   const [loading, setLoading]         = useState(true);
+  const [meId, setMeId]               = useState<string | null>(null);
+  const [opening, setOpening]         = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setMeId(data.session?.user?.id ?? null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setMeId(session?.user?.id ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  async function openChatWith(participantId: string) {
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess.session?.access_token;
+    if (!token) { router.push('/login'); return; }
+    setOpening(true);
+    try {
+      const res = await fetch(`${API}/api/messages/conversations`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ participantId }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.data?.id) {
+        alert(json?.error || 'Could not start conversation');
+        return;
+      }
+      router.push(`/messages?c=${json.data.id}`);
+    } finally {
+      setOpening(false);
+    }
+  }
 
   const [q, setQ]                     = useState('');
   const [researchArea, setResearchArea] = useState('');
@@ -216,6 +251,15 @@ export default function DirectoryPage() {
             {selected.goals?.length > 0 && <div className="mb-4"><p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Conference Goals</p><p className="text-sm text-gray-700">{selected.goals.join(' · ')}</p></div>}
             {selected.company_name && <div className="mb-4"><p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Company</p><p className="text-sm text-gray-700">{selected.company_name}</p></div>}
             <div className="flex gap-2 mt-4 flex-wrap">
+              {meId && selected.id !== meId && (
+                <button
+                  onClick={() => openChatWith(selected.id)}
+                  disabled={opening}
+                  className="text-sm px-3 py-1.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  {opening ? 'Opening…' : '💬 Send Message'}
+                </button>
+              )}
               {selected.linkedin_url && <a href={selected.linkedin_url} target="_blank" rel="noreferrer" className="text-sm px-3 py-1.5 border border-gray-200 rounded-lg text-blue-600 hover:bg-blue-50">LinkedIn</a>}
               {selected.google_scholar_url && <a href={selected.google_scholar_url} target="_blank" rel="noreferrer" className="text-sm px-3 py-1.5 border border-gray-200 rounded-lg text-blue-600 hover:bg-blue-50">Google Scholar</a>}
             </div>
