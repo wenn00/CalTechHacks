@@ -189,10 +189,12 @@ model sessions {
   location            String?
   day                 String?  // legacy "day1"/"day2"/etc. string
 
-  // New columns for /ardd
+  // New columns for /ardd. conference_date_key and conference_day were
+  // initially nullable to give existing rows a chance to be backfilled;
+  // tightened to NOT NULL once seed/backfill populated every row.
   description         String?
-  conference_date_key String?  // "YYYY-MM-DD" in CONFERENCE_TIMEZONE — required after backfill
-  conference_day      Int?     // 1, 2, 3, ... — required after backfill
+  conference_date_key String   // "YYYY-MM-DD" in CONFERENCE_TIMEZONE
+  conference_day      Int      // 1, 2, 3, ...
   speaker_id          String?
   track_id            String?
 
