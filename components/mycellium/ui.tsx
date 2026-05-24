@@ -154,8 +154,8 @@ export function AppSidebar({ view = 'directory', onViewChange, activeSection }: 
           <img
             src="/mycellium/logo.png"
             alt="Mycellium"
-            className={`h-10 object-contain object-left transition-[width,height] ${
-              collapsed ? 'w-10 lg:h-10' : 'w-10 lg:h-20 lg:w-48'
+            className={`h-10 object-left transition-[width,height] ${
+              collapsed ? 'w-10 object-cover lg:h-10' : 'w-10 object-contain lg:h-20 lg:w-48'
             }`}
           />
           <nav className="flex items-center gap-2 md:flex-col md:items-stretch md:gap-4">
