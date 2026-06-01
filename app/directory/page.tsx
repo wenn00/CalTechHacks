@@ -319,15 +319,27 @@ export default function DirectoryPage() {
 
     setMatchStatus('connecting');
     try {
-      const response = await fetch(`${API}/api/matches/swipe`, {
+      // Record the connect swipe
+      await fetch(`${API}/api/matches/swipe`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetId: selected.id, action: 'connect' }),
       });
-      setMatchStatus(response.ok ? 'connected' : 'error');
+
+      // Create (or retrieve) the conversation and navigate to it
+      const convRes = await fetch(`${API}/api/messages/conversations`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ participantId: selected.id }),
+      });
+      const convJson = await convRes.json().catch(() => null);
+      const convId = convJson?.data?.id;
+
+      if (convId) {
+        router.push(`/messages?c=${convId}`);
+      } else {
+        setMatchStatus('connected');
+      }
     } catch {
       setMatchStatus('error');
     }

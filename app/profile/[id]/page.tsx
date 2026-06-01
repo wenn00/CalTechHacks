@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AppSidebar, MyButton, Tag } from '@/components/mycellium/ui';
+import { supabase } from '@/lib/supabase';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -33,6 +34,33 @@ export default function PublicProfilePage() {
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [msgLoading, setMsgLoading] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setCurrentUserId(data.session?.user?.id ?? null);
+    });
+  }, []);
+
+  const handleMessage = async () => {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) { router.push('/login'); return; }
+    setMsgLoading(true);
+    try {
+      const res = await fetch(`${API}/api/messages/conversations`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ participantId: profileId }),
+      });
+      const json = await res.json().catch(() => null);
+      const convId = json?.data?.id;
+      if (convId) router.push(`/messages?c=${convId}`);
+    } finally {
+      setMsgLoading(false);
+    }
+  };
 
   useEffect(() => {
     async function loadProfile() {
@@ -97,9 +125,16 @@ export default function PublicProfilePage() {
                     {[profile.role, profile.institution].filter(Boolean).join(' - ') || formatStage(profile.career_stage)}
                   </p>
                 </div>
-                <MyButton variant="secondary" className="w-full px-4 text-sm sm:w-auto" onClick={() => router.push('/directory')}>
-                  Back to Directory
-                </MyButton>
+                <div className="flex gap-2">
+                  {currentUserId && currentUserId !== profileId && (
+                    <MyButton className="w-full px-4 text-sm sm:w-auto" onClick={handleMessage} disabled={msgLoading}>
+                      {msgLoading ? 'Opening...' : 'Message'}
+                    </MyButton>
+                  )}
+                  <MyButton variant="secondary" className="w-full px-4 text-sm sm:w-auto" onClick={() => router.push('/directory')}>
+                    Back to Directory
+                  </MyButton>
+                </div>
               </header>
 
               <div className="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
