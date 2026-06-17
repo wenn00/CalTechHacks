@@ -1,8 +1,19 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { BrandRail, ChoiceCard, Field, MyButton, SelectField, Tag } from '@/components/mycellium/ui';
+import { BrandRail, ChoiceCard, Field, MycelliumLoader, MyButton, SelectField, Tag } from '@/components/mycellium/ui';
+
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+
+const PROGRESS_STEPS = [
+  'Mapping your expertise...',
+  'Tracing shared interests...',
+  'Growing relationship pathways...',
+  'Discovering hidden connections...',
+  'Strengthening network clusters...',
+  'Connecting you to your network...',
+];
 
 const ROLE_OPTIONS = [
   'Academic Researcher',
@@ -80,6 +91,20 @@ export default function OnboardingForm() {
   const [keywordInput, setKeywordInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [progressStep, setProgressStep] = useState(0);
+  const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (saving) {
+      progressTimer.current = setInterval(() => {
+        setProgressStep((s) => (s + 1) % PROGRESS_STEPS.length);
+      }, 900);
+    } else {
+      if (progressTimer.current) clearInterval(progressTimer.current);
+      setProgressStep(0);
+    }
+    return () => { if (progressTimer.current) clearInterval(progressTimer.current); };
+  }, [saving]);
 
   const isProfileValid = Boolean(formData.firstName.trim() && formData.lastName.trim() && formData.email.trim() && formData.institution.trim());
   const isRoleValid = Boolean(formData.role && formData.careerStage);
@@ -116,9 +141,14 @@ export default function OnboardingForm() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('name, email, institution, role, career_stage, research_area, research_keywords, goals')
+        .select('name, email, institution, role, career_stage, research_area, research_keywords, goals, onboarding_complete')
         .eq('id', user.id)
         .maybeSingle();
+
+      if (profile?.onboarding_complete) {
+        window.location.href = '/directory';
+        return;
+      }
 
       const profileName = typeof profile?.name === 'string' ? profile.name : '';
       const [profileFirst = firstName, ...profileRest] = profileName.split(' ').filter(Boolean);
@@ -193,6 +223,11 @@ export default function OnboardingForm() {
       return;
     }
 
+    const photoUrl =
+      (user.user_metadata?.avatar_url as string | undefined) ??
+      (user.user_metadata?.picture as string | undefined) ??
+      null;
+
     const { error } = await supabase.from('profiles').upsert({
       id: user.id,
       email: formData.email || user.email,
@@ -205,6 +240,7 @@ export default function OnboardingForm() {
       session_interests: formData.selectedAreas,
       goals: formData.goals,
       onboarding_complete: true,
+      photo_url: photoUrl,
       updated_at: new Date().toISOString(),
     });
 
@@ -214,13 +250,32 @@ export default function OnboardingForm() {
       return;
     }
 
+    // Trigger match recomputation in the background (fire and forget)
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (token) {
+      fetch(`${API}/api/matches/compute`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {});
+    }
+
     window.location.href = '/directory';
   };
 
+  if (saving) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-white">
+        <MycelliumLoader label={PROGRESS_STEPS[progressStep]} />
+        <p className="text-xs text-zinc-400">Building your research network</p>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-white text-sm text-zinc-500">
-        Loading onboarding...
+      <div className="flex min-h-screen items-center justify-center bg-white">
+        <MycelliumLoader label="Loading your profile..." />
       </div>
     );
   }

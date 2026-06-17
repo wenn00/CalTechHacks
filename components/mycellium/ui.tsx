@@ -522,3 +522,63 @@ function formatAccountStage(stage: string | null) {
   if (!stage) return 'Not set';
   return stage.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }
+
+// ─── Mycellium branded loader ──────────────────────────────────────────────────
+
+const LOADER_NODES = [
+  { cx: 50, cy: 13, delay: '0s' },
+  { cx: 80, cy: 31, delay: '0.25s' },
+  { cx: 83, cy: 65, delay: '0.5s' },
+  { cx: 63, cy: 87, delay: '0.75s' },
+  { cx: 37, cy: 87, delay: '1s' },
+  { cx: 17, cy: 65, delay: '1.25s' },
+  { cx: 20, cy: 31, delay: '1.5s' },
+];
+
+export function MycelliumLoader({ label }: { label?: string }) {
+  return (
+    <div className="flex flex-col items-center gap-5">
+      <svg viewBox="0 0 100 100" className="h-28 w-28" aria-hidden="true">
+        {/* Spokes: center → outer nodes */}
+        {LOADER_NODES.map((node, i) => (
+          <line key={`s${i}`} x1="50" y1="50" x2={node.cx} y2={node.cy}
+            stroke="#4a9b8e" strokeWidth="1.2" strokeLinecap="round">
+            <animate attributeName="opacity" values="0.15;0.75;0.15"
+              dur="2s" begin={node.delay} repeatCount="indefinite" />
+          </line>
+        ))}
+        {/* Ring edges */}
+        {LOADER_NODES.map((node, i) => {
+          const next = LOADER_NODES[(i + 1) % LOADER_NODES.length]!;
+          return (
+            <line key={`r${i}`} x1={node.cx} y1={node.cy} x2={next.cx} y2={next.cy}
+              stroke="#9fd5cd" strokeWidth="0.7" strokeLinecap="round">
+              <animate attributeName="opacity" values="0.1;0.45;0.1"
+                dur="2.8s" begin={`${i * 0.4}s`} repeatCount="indefinite" />
+            </line>
+          );
+        })}
+        {/* Outer nodes */}
+        {LOADER_NODES.map((node, i) => (
+          <circle key={`n${i}`} cx={node.cx} cy={node.cy} r="5" fill="#9fd5cd">
+            <animate attributeName="r" values="4;6;4" dur="2s" begin={node.delay} repeatCount="indefinite" />
+            <animate attributeName="fill" values="#9fd5cd;#4a9b8e;#9fd5cd"
+              dur="2s" begin={node.delay} repeatCount="indefinite" />
+          </circle>
+        ))}
+        {/* Center node */}
+        <circle cx="50" cy="50" r="10" fill="#195c52">
+          <animate attributeName="r" values="8;12;8" dur="2.5s" repeatCount="indefinite" />
+        </circle>
+        {/* Pulse ring */}
+        <circle cx="50" cy="50" r="14" fill="none" stroke="#4a9b8e" strokeWidth="1">
+          <animate attributeName="r" values="12;24" dur="2s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values="0.6;0" dur="2s" repeatCount="indefinite" />
+        </circle>
+      </svg>
+      {label && (
+        <p className="animate-pulse text-center text-sm font-semibold text-[#195c52]">{label}</p>
+      )}
+    </div>
+  );
+}

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { AppSidebar, Field, MyButton, SelectField, Tag } from '@/components/mycellium/ui';
+import { AppSidebar, Field, MycelliumLoader, MyButton, SelectField, Tag } from '@/components/mycellium/ui';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -666,7 +666,7 @@ function NetworkGraph({
   const nodes = people.slice(0, NODE_POSITIONS.length);
 
   if (loading) {
-    return <div className="flex h-[560px] items-center justify-center text-sm text-zinc-500">Loading network...</div>;
+    return <div className="flex h-[560px] items-center justify-center"><MycelliumLoader label="Growing your network..." /></div>;
   }
 
   if (!nodes.length) {
@@ -712,11 +712,6 @@ function NetworkGraph({
             title={`Open ${person.name} profile`}
           >
             {person.photo_url ? <img src={person.photo_url} alt="" className="h-full w-full rounded-full object-cover" /> : initials(person.name)}
-            {typeof person.score === 'number' && (
-              <span className="absolute -right-3 -top-2 rounded-full bg-[#195c52] px-2 py-1 text-[11px] font-bold text-white">
-                {formatScore(person.score)}
-              </span>
-            )}
           </button>
         );
       })}
